@@ -9,11 +9,11 @@ export class ViewManager {
     this.pitchContainer = document.getElementById("pitch-container");
     this.playersContainer = document.getElementById("players-container");
     this.placeholder = document.getElementById("substitutes-placeholder");
-    
+
     // AppRef für Ereignisbehandlung verwenden, statt direkt auf App zuzugreifen
     this.appRef = null;
   }
-  
+
   init(appRef) {
     this.appRef = appRef;
   }
@@ -33,25 +33,37 @@ export class ViewManager {
       "cursor-move"
     );
     playerItem.dataset.playerId = player.id;
-    
+
     playerItem.addEventListener(
       "dragstart",
-      this.appRef ? this.appRef.eventHandler.handleDragStart.bind(this.appRef.eventHandler) : () => console.warn("EventHandler not initialized")
+      this.appRef
+        ? this.appRef.eventHandler.handleDragStart.bind(
+            this.appRef.eventHandler
+          )
+        : () => console.warn("EventHandler not initialized")
     );
-    
+
     // Wichtig: Auch für Bank-Spieler den dragend-Event-Handler hinzufügen
     playerItem.addEventListener(
       "dragend",
-      this.appRef ? this.appRef.eventHandler.handleDragEnd.bind(this.appRef.eventHandler) : () => console.warn("EventHandler not initialized")
+      this.appRef
+        ? this.appRef.eventHandler.handleDragEnd.bind(this.appRef.eventHandler)
+        : () => console.warn("EventHandler not initialized")
     );
-    
+
     playerItem.addEventListener(
       "touchstart",
-      this.appRef ? this.appRef.eventHandler.handleTouchStart.bind(this.appRef.eventHandler) : () => console.warn("EventHandler not initialized")
+      this.appRef
+        ? this.appRef.eventHandler.handleTouchStart.bind(
+            this.appRef.eventHandler
+          )
+        : () => console.warn("EventHandler not initialized")
     );
     playerItem.addEventListener(
       "touchend",
-      this.appRef ? this.appRef.eventHandler.handleTouchEnd.bind(this.appRef.eventHandler) : () => console.warn("EventHandler not initialized")
+      this.appRef
+        ? this.appRef.eventHandler.handleTouchEnd.bind(this.appRef.eventHandler)
+        : () => console.warn("EventHandler not initialized")
     );
     this.substitutesList.appendChild(playerItem);
   }
@@ -114,13 +126,20 @@ export class ViewManager {
     playerDiv.style.setProperty("--player-x", player.percentX + "%");
     playerDiv.style.setProperty("--player-y", player.percentY + "%");
     playerDiv.style.left = "var(--player-x)";
-    playerDiv.style.top = "var(--player-y)";    playerDiv.addEventListener(
+    playerDiv.style.top = "var(--player-y)";
+    playerDiv.addEventListener(
       "dragstart",
-      this.appRef ? this.appRef.eventHandler.handleDragStart.bind(this.appRef.eventHandler) : () => console.warn("EventHandler not initialized")
+      this.appRef
+        ? this.appRef.eventHandler.handleDragStart.bind(
+            this.appRef.eventHandler
+          )
+        : () => console.warn("EventHandler not initialized")
     );
     playerDiv.addEventListener(
       "dragend",
-      this.appRef ? this.appRef.eventHandler.handleDragEnd.bind(this.appRef.eventHandler) : () => console.warn("EventHandler not initialized")
+      this.appRef
+        ? this.appRef.eventHandler.handleDragEnd.bind(this.appRef.eventHandler)
+        : () => console.warn("EventHandler not initialized")
     );
   }
 
@@ -165,7 +184,7 @@ export class ViewManager {
       );
     }
   }
-  
+
   clearViews() {
     this.substitutesList.innerHTML = "";
     this.playersContainer
@@ -199,16 +218,20 @@ export class ViewManager {
 
   // Eine konsolidierte Version der highlightClosestMarker Methode
   highlightClosestMarker(x, y) {
-    const markers = Array.from(this.playersContainer.querySelectorAll('.position-marker'));
+    const markers = Array.from(
+      this.playersContainer.querySelectorAll(".position-marker")
+    );
     let closestMarker = null;
     let minDistance = Infinity;
     const HIGHLIGHT_THRESHOLD = 15; // Schwellenwert für Highlight und Snap
 
-    markers.forEach(marker => {
+    markers.forEach((marker) => {
       const markerX = parseFloat(marker.dataset.x);
       const markerY = parseFloat(marker.dataset.y);
-      const distance = Math.sqrt(Math.pow(x - markerX, 2) + Math.pow(y - markerY, 2));
-      
+      const distance = Math.sqrt(
+        Math.pow(x - markerX, 2) + Math.pow(y - markerY, 2)
+      );
+
       if (distance < minDistance) {
         minDistance = distance;
         closestMarker = marker;
@@ -216,28 +239,28 @@ export class ViewManager {
     });
 
     // Reset all markers - verwende mehr Tailwind-Klassen und unsere benutzerdefinierte Animation
-    markers.forEach(marker => {
+    markers.forEach((marker) => {
       marker.classList.remove(
-        'border-4', 
-        'bg-blue-100/30',
-        'animate-pulse-scale',
+        "border-4",
+        "bg-blue-100/30",
+        "animate-pulse-scale"
       );
-      marker.classList.add('border-2');
+      marker.classList.add("border-2");
     });
 
     // Highlight closest if within threshold - verwende unsere benutzerdefinierte Wellenanimation
     if (closestMarker && minDistance < HIGHLIGHT_THRESHOLD) {
-      closestMarker.classList.remove( 'border-2');
+      closestMarker.classList.remove("border-2");
       closestMarker.classList.add(
-        'border-blue-600', 
-        'border-4', 
-        'bg-blue-100/30',
-        'animate-pulse-scale'  // Neue Wellenanimation statt animate-pulse
+        "border-blue-600",
+        "border-4",
+        "bg-blue-100/30",
+        "animate-pulse-scale" // Neue Wellenanimation statt animate-pulse
       );
       return {
         x: parseFloat(closestMarker.dataset.x),
         y: parseFloat(closestMarker.dataset.y),
-        shouldSnap: true
+        shouldSnap: true,
       };
     }
     return null;
@@ -246,20 +269,21 @@ export class ViewManager {
   // Check if point is within pitch SVG bounds
   isPointInPitch(x, y, pitchRect) {
     // Get SVG dimensions using the helper method
-    const { svgWidth, svgHeight, svgX, svgY } = this.getSvgDimensions(pitchRect);
+    const { svgWidth, svgHeight, svgX, svgY } =
+      this.getSvgDimensions(pitchRect);
 
     // Check if we got valid dimensions
     if (svgWidth <= 0 || svgHeight <= 0) {
-      console.error('Invalid SVG dimensions');
+      console.error("Invalid SVG dimensions");
       return false;
     }
 
     // Check if point is within the SVG area
-    const isInside = x >= svgX && x <= svgX + svgWidth && 
-                    y >= svgY && y <= svgY + svgHeight;
+    const isInside =
+      x >= svgX && x <= svgX + svgWidth && y >= svgY && y <= svgY + svgHeight;
 
     if (!isInside) {
-      console.log('Drop rejected: outside SVG bounds');
+      // Drop outside SVG bounds
       return false;
     }
 
@@ -269,31 +293,34 @@ export class ViewManager {
 
     // Additional check: is point within the actual pitch area (excluding border)?
     // The pitch has a 10px border in the SVG (from pitch.svg)
-    const isOnPitch = svgRelativeX >= 10 && svgRelativeX <= svgWidth - 10 &&
-                      svgRelativeY >= 10 && svgRelativeY <= svgHeight - 10;
+    const isOnPitch =
+      svgRelativeX >= 10 &&
+      svgRelativeX <= svgWidth - 10 &&
+      svgRelativeY >= 10 &&
+      svgRelativeY <= svgHeight - 10;
 
     if (!isOnPitch) {
-      console.log('Drop rejected: outside pitch area');
+      console.log("Drop rejected: outside pitch area");
       return false;
     }
 
     return true;
   }
-  
+
   // Helper method to calculate SVG dimensions
   getSvgDimensions(pitchRect) {
     try {
       // Get the actual SVG dimensions from the object element
-      const svgObject = this.pitchContainer.querySelector('object');
+      const svgObject = this.pitchContainer.querySelector("object");
       if (!svgObject) {
-        console.error('SVG object not found');
+        console.error("SVG object not found");
         return { svgWidth: 0, svgHeight: 0, svgX: 0, svgY: 0 };
       }
 
       // Get the SVG document
       const svgDoc = svgObject.contentDocument;
       if (!svgDoc) {
-        console.error('SVG document not loaded');
+        console.error("SVG document not loaded");
         return { svgWidth: 0, svgHeight: 0, svgX: 0, svgY: 0 };
       }
 
@@ -308,7 +335,7 @@ export class ViewManager {
 
       return { svgWidth, svgHeight, svgX, svgY };
     } catch (error) {
-      console.error('Error getting SVG dimensions:', error);
+      console.error("Error getting SVG dimensions:", error);
       return { svgWidth: 0, svgHeight: 0, svgX: 0, svgY: 0 };
     }
   }

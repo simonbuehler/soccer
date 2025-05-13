@@ -2,7 +2,7 @@
  * EventHandler-Klasse behandelt Interaktionsevents wie Drag&Drop
  */
 
-import { App } from '../script.js';
+import { App } from "../script.js";
 
 export class EventHandler {
   constructor(playerPool, viewManager) {
@@ -19,30 +19,33 @@ export class EventHandler {
 
   handleDragEnd(e) {
     const playerId = e.target.dataset.playerId;
-    
+
     // Wichtig: Alle Elemente mit der Klasse "opacity-50" zurücksetzen
     // Dies stellt sicher, dass kein Spieler halbtransparent bleibt
-    document.querySelectorAll(`.opacity-50`).forEach(el => {
+    document.querySelectorAll(`.opacity-50`).forEach((el) => {
       el.classList.remove("opacity-50", "dragging");
     });
-    
+
     // Zusätzlich: Auch gezielt alle Elemente des gezogenen Spielers zurücksetzen
     if (playerId) {
-      document.querySelectorAll(`[data-player-id="${playerId}"]`).forEach(el => {
-        el.classList.remove("opacity-50", "dragging");
-      });
+      document
+        .querySelectorAll(`[data-player-id="${playerId}"]`)
+        .forEach((el) => {
+          el.classList.remove("opacity-50", "dragging");
+        });
     }
-    
+
     // Reset all marker highlights
-    this.viewManager.playersContainer.querySelectorAll('.position-marker')
-      .forEach(marker => {
+    this.viewManager.playersContainer
+      .querySelectorAll(".position-marker")
+      .forEach((marker) => {
         marker.classList.remove(
-          'border-4', 
-          'bg-blue-100/30',
-          'animate-pulse-scale',
-          'shadow-lg'
+          "border-4",
+          "bg-blue-100/30",
+          "animate-pulse-scale",
+          "shadow-lg"
         );
-        marker.classList.add('border-2');
+        marker.classList.add("border-2");
       });
   }
 
@@ -66,7 +69,7 @@ export class EventHandler {
 
     e.target.classList.add("opacity-50");
   }
-  
+
   handleTouchEnd(e) {
     try {
       e.preventDefault();
@@ -98,29 +101,34 @@ export class EventHandler {
         // Check if position is allowed based on current tactic
         const positionMarkers = App.tacticManager.getPositionMarkers();
         const isFreePlacement = positionMarkers.length === 0;
-        
+
         // Calculate percentages relative to SVG dimensions
         const percentX = (touchX / svgRect.width) * 100;
         const percentY = (touchY / svgRect.height) * 100;
-        
+
         // Get max player count
         const gameType = App.tacticManager.getCurrentGameType();
         const maxPlayers = gameType || 11; // Default to 11 if gameType is not set
-        
+
         // Check if adding a new player would exceed the limit
-        if (isFreePlacement && 
-            player.location !== "pitch" && 
-            this.playerPool.getPitchPlayers().length >= maxPlayers) {
-          console.log(`Cannot add more players. Maximum of ${maxPlayers} players allowed.`);
+        if (
+          isFreePlacement &&
+          player.location !== "pitch" &&
+          this.playerPool.getPitchPlayers().length >= maxPlayers
+        ) {
+          // Player limit reached
           return;
         }
-        
+
         // Find closest marker if tactic is active
         let targetX, targetY;
         let canPlace = isFreePlacement;
-        
+
         if (!isFreePlacement) {
-          const highlightResult = this.viewManager.highlightClosestMarker(percentX, percentY);
+          const highlightResult = this.viewManager.highlightClosestMarker(
+            percentX,
+            percentY
+          );
           if (highlightResult && highlightResult.shouldSnap) {
             targetX = highlightResult.x;
             targetY = highlightResult.y;
@@ -134,10 +142,11 @@ export class EventHandler {
 
         if (canPlace) {
           // Check for existing player at target position
-          const existingPlayer = this.playerPool.getPitchPlayers().find(p => 
-            Math.abs(p.percentX - targetX) < 0.1 && 
-            Math.abs(p.percentY - targetY) < 0.1 &&
-            p.id !== playerId  // Nicht sich selbst finden
+          const existingPlayer = this.playerPool.getPitchPlayers().find(
+            (p) =>
+              Math.abs(p.percentX - targetX) < 0.1 &&
+              Math.abs(p.percentY - targetY) < 0.1 &&
+              p.id !== playerId // Nicht sich selbst finden
           );
 
           if (existingPlayer) {
@@ -145,12 +154,12 @@ export class EventHandler {
             const oldX = player.percentX;
             const oldY = player.percentY;
             const wasOnPitch = player.location === "pitch";
-            
+
             // Verschiebe aktuellen Spieler zur neuen Position
             player.percentX = targetX;
             player.percentY = targetY;
             player.location = "pitch";
-            
+
             // Verschiebe existierenden Spieler zur alten Position oder auf die Bank
             if (wasOnPitch) {
               // Existierender Spieler übernimmt Position des gezogenen Spielers
@@ -161,12 +170,13 @@ export class EventHandler {
               // Gezogener Spieler kommt von Bank, existierender geht auf Bank
               existingPlayer.location = "bench";
             }
-            
+
             this.playerPool.updateView();
           } else if (
             player.location === "pitch" ||
-            this.viewManager.playersContainer.querySelectorAll(".player-position")
-              .length < App.tacticManager.getCurrentGameType()  // Hier getCurrentGameType() statt getPlayerCount()
+            this.viewManager.playersContainer.querySelectorAll(
+              ".player-position"
+            ).length < App.tacticManager.getCurrentGameType() // Hier getCurrentGameType() statt getPlayerCount()
           ) {
             // Keine Konflikt - Bewege Spieler zur Zielposition
             player.percentX = targetX;
@@ -180,18 +190,19 @@ export class EventHandler {
     } finally {
       e.target?.classList?.remove("opacity-50");
       this.activeTouchId = null;
-      
+
       // Reset marker highlights
-      App.viewManager.playersContainer.querySelectorAll('.position-marker')
-        .forEach(marker => {
+      App.viewManager.playersContainer
+        .querySelectorAll(".position-marker")
+        .forEach((marker) => {
           marker.classList.remove(
-            'border-blue-600', 
-            'border-4', 
-            'bg-blue-100/30',
-            'animate-pulse-scale',  // Neue Klasse statt animate-pulse
-            'shadow-lg'
+            "border-blue-600",
+            "border-4",
+            "bg-blue-100/30",
+            "animate-pulse-scale", // Neue Klasse statt animate-pulse
+            "shadow-lg"
           );
-          marker.classList.add('border-blue-400', 'border-2');
+          marker.classList.add("border-blue-400", "border-2");
         });
     }
   }
