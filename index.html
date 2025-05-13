@@ -64,16 +64,51 @@
           Aktionen
         </h2>
         <div class="mt-4 flex flex-wrap justify-center gap-3">
+          <!-- Spielart Auswahl -->
+          <div class="w-full flex gap-1 bg-gray-100 p-1 rounded-lg">
+            <button class="flex-1 py-2 px-3 rounded-md transition-colors game-type-btn active" 
+                    data-type="7er">7er</button>
+            <button class="flex-1 py-2 px-3 rounded-md transition-colors game-type-btn" 
+                    data-type="9er">9er</button>
+            <button class="flex-1 py-2 px-3 rounded-md transition-colors game-type-btn" 
+                    data-type="11er">11er</button>
+          </div>
+
+          <!-- Taktik Auswahl -->
+          <div class="w-full">
+            <label for="tactic-select" class="block text-sm font-medium text-gray-700 mb-1">Taktik wählen:</label>
+            <div class="flex items-center">
+              <select id="tactic-select" 
+                class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                <!-- Optionen werden dynamisch durch JS gefüllt -->
+              </select>
+              <!-- Info Icon für erweiterte Taktikbeschreibung -->
+              <button id="tactic-info-icon" class="ml-2 p-2 text-blue-600 hover:text-blue-800 focus:outline-none" style="display: none;" title="Mehr Informationen zur Taktik">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </button>
+            </div>
+            
+            <!-- Kompakte Taktik-Informationen (initial ausgeblendet) -->
+            <div id="tactic-info-compact" class="mt-3 p-3 bg-gray-50 rounded border border-gray-200" style="display: none;">
+              <p id="tactic-info-description" class="text-sm font-semibold text-gray-800"></p>
+              <ul id="tactic-info-bulletpoints" class="list-disc list-inside text-xs text-gray-600 mt-1">
+                <!-- Bulletpoints werden dynamisch gefüllt -->
+              </ul>
+            </div>
+          </div>
+
           <button
             class="px-6 lg:w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg shadow transition-all duration-200 hover:shadow-md"
-            onclick="openPlayerDialog()">
+            id="add-players-btn">
             Spieler hinzufügen
           </button>
           <button
             class="px-6 lg:w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg shadow transition-all duration-200 hover:shadow-md"
-            onclick="printPitch()">
+            id="print-btn">
             Drucken
-          </button>
+          </button>          
         </div>
       </div>
 
@@ -112,19 +147,38 @@
           placeholder="Nummer Nachname, Vorname (z.B. 10 Müller, Thomas)" rows="5"></textarea>
         <div class="flex justify-end space-x-3">
           <button class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-lg transition-colors"
-            onclick="closePlayerDialog()">
+            id="cancel-btn">
             Abbrechen
           </button>
           <button class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
-            onclick="addPlayersAndClose()">
+            id="add-close-btn">
             Hinzufügen
           </button>
         </div>
       </div>
     </div>
+
+    <!-- Modal für erweiterte Taktik-Informationen (initial ausgeblendet) -->
+    <div id="tactic-info-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center hidden px-4">
+      <div class="relative mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center pb-3 border-b">
+          <h3 id="tactic-modal-title" class="text-xl font-bold text-gray-900">Taktik Details</h3>
+          <button id="tactic-modal-close-btn" class="text-gray-400 hover:text-gray-600 focus:outline-none">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div class="mt-3">
+          <p id="tactic-modal-extended-description" class="text-sm text-gray-700 leading-relaxed">
+            <!-- Ausführliche Beschreibung wird dynamisch gefüllt -->
+          </p>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <script src="src/js/script.js"></script>
+  <script type="module" src="src/js/script.js"></script>
 </body>
 
 </html>

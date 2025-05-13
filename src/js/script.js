@@ -1,628 +1,539 @@
 /**
- * Fußball Aufstellung Tool (Refactored)
- * Verwaltet Spieler in zentralem Pool mit Location-Tracking
+ * Soccer Lineup Tool (Refactored)
+ * Manages players in a central pool with location tracking.
  */
 
-const MAX_PLAYERS = 9; // Maximum players allowed on pitch
+// First load core classes that don't have dependencies
+import { Player } from './classes/Player.js';
+import { PlayerPool } from './classes/PlayerPool.js';
+import { ViewManager } from './classes/ViewManager.js';
 
-// DOM-Elementreferenzen
+// Then load classes that depend on the core classes
+import { UIManager } from './classes/UIManager.js';
+import { PlayerInputHandler } from './classes/PlayerInputHandler.js';
+import { EventHandler } from './classes/EventHandler.js';
+import { TacticManager } from './tactics/TacticManager.js';
+
+// DOM element references
 const playerInput = document.getElementById("player-input");
 const playerDialog = document.getElementById("player-dialog");
+// DOM references for tactic info display - assuming these IDs exist in your HTML
+const tacticInfoCompact = document.getElementById('tactic-info-compact');
+const tacticInfoDescription = document.getElementById('tactic-info-description');
+const tacticInfoBulletpoints = document.getElementById('tactic-info-bulletpoints');
+const tacticInfoIcon = document.getElementById('tactic-info-icon');
+const tacticInfoModal = document.getElementById('tactic-info-modal');
+const tacticModalTitle = document.getElementById('tactic-modal-title');
+const tacticModalExtendedDescription = document.getElementById('tactic-modal-extended-description');
+const tacticModalCloseBtn = document.getElementById('tactic-modal-close-btn');
 
-class PlayerPool {
-  constructor() {
-    this.players = [];
-    this.viewManager = new ViewManager(this);
-  }
-
-  addPlayer(player) {
-    // Check for first name conflicts
-    const sameFirstNamePlayers = this.players.filter(
-      (p) => p.firstName.split(" ")[0] === player.firstName.split(" ")[0]
-    );
-
-    if (sameFirstNamePlayers.length > 0) {
-      // Check if last initials are also the same
-      const sameInitialPlayers = sameFirstNamePlayers.filter(
-        (p) =>
-          p.lastName.charAt(0).toUpperCase() ===
-          player.lastName.charAt(0).toUpperCase()
-      );
-
-      if (sameInitialPlayers.length > 0) {
-        // Full last name needed
-        sameInitialPlayers.forEach((p) => p.updateDisplayName(true));
-        player.updateDisplayName(true);
-      } else {
-        // Just initial needed
-        sameFirstNamePlayers.forEach((p) => p.updateDisplayName(false, true));
-        player.updateDisplayName(false, true);
-      }
-    }
-
-    this.players.push(player);
-    this.updateView();
-  }
-
-  movePlayer(playerId, newLocation) {
-    const player = this.getPlayerById(playerId);
-    if (player) {
-      player.location = newLocation;
-      this.updateView();
-    }
-  }
-
-  updateView() {
-    this.viewManager.clearViews();
-    this.viewManager.updatePlaceholder();
-
-    // Rebuild views
-    this.players.forEach((player) => {
-      if (player.location === "bench") {
-        this.viewManager.createBenchPlayer(player);
-      } else if (player.location === "pitch") {
-        this.viewManager.createPitchPlayer(player);
-      }
-    });
-  }
-
-  getPlayerById(id) {
-    return this.players.find((p) => p.id === id);
-  }
-
-  getBenchPlayers() {
-    return this.players.filter((p) => p.location === "bench");
-  }
-
-  getPitchPlayers() {
-    return this.players.filter((p) => p.location === "pitch");
-  }
-}
-
-class Player {
-  constructor(number, firstName, lastName = "") {
-    this.id = `player-${number}-${firstName}-${lastName}`;
-    this.number = number;
-    this.firstName = firstName;
-    this.lastName = lastName;
-    this.location = "bench";
-    this.displayName = `${number}, ${firstName.split(" ")[0]}`;
-    this.x = 0;
-    this.y = 0;
-    this.percentX = 0;
-    this.percentY = 0;
-  }
-
-  updateDisplayName(showLastName = false, showInitial = false) {
-    const firstNamePart = this.firstName.split(" ")[0];
-    let lastNamePart = "";
-
-    if (showLastName) {
-      lastNamePart = ` ${this.lastName}`;
-    } else if (showInitial) {
-      lastNamePart = ` ${this.lastName.charAt(0).toUpperCase()}.`;
-    }
-
-    this.displayName = `${this.number}, ${firstNamePart}${lastNamePart}`;
-  }
-}
-
-class ViewManager {
-  constructor(playerPool) {
-    this.playerPool = playerPool;
-    this.substitutesList = document.getElementById("substitutes");
-    this.pitchContainer = document.getElementById("pitch-container");
-    this.playersContainer = document.getElementById("players-container");
-    this.placeholder = document.getElementById("substitutes-placeholder");
-  }
-
-  createBenchPlayer(player) {
-    const playerItem = document.createElement("li");
-    playerItem.textContent = player.displayName;
-    playerItem.draggable = true;
-    playerItem.classList.add(
-      "player",
-      "bg-blue-600",
-      "text-white",
-      "mb-2",
-      "px-3",
-      "py-2",
-      "rounded-lg",
-      "cursor-move"
-    );
-    playerItem.dataset.playerId = player.id;
-    playerItem.addEventListener(
-      "dragstart",
-      App.eventHandler.handleDragStart.bind(App.eventHandler)
-    );
-    playerItem.addEventListener(
-      "touchstart",
-      App.eventHandler.handleTouchStart.bind(App.eventHandler)
-    );
-    playerItem.addEventListener(
-      "touchend",
-      App.eventHandler.handleTouchEnd.bind(App.eventHandler)
-    );
-    this.substitutesList.appendChild(playerItem);
-  }
-
-  createPitchPlayer(player) {
-    const playerDiv = document.createElement("div");
-    playerDiv.classList.add(
-      "player-position",
-      "absolute",
-      "w-14",
-      "h-14",
-      "bg-white/90",
-      "rounded-full",
-      "font-bold",
-      "text-lg",
-      "shadow-lg",
-      "cursor-move",
-      "border-2",
-      "border-grey-600",
-      "backdrop-blur-sm",
-      "overflow-hidden"
-    );
-    this.playersContainer.appendChild(playerDiv);
-
-    // Number backdrop
-    const numberBackdrop = document.createElement("div");
-    numberBackdrop.classList.add(
-      "absolute",
-      "inset-0",
-      "flex",
-      "items-center",
-      "justify-center",
-      "text-4xl",
-      "font-bold",
-      "text-green-600/50"
-    );
-    numberBackdrop.textContent = player.number;
-    playerDiv.appendChild(numberBackdrop);
-
-    // Name text
-    const nameText = document.createElement("div");
-    nameText.classList.add(
-      "absolute",
-      "top-1/2",
-      "left-1/2",
-      "transform",
-      "-translate-x-1/2",
-      "-translate-y-1/2",
-      "z-10",
-      "text-xs",
-      "font-bold",
-      "text-center",
-      "text-grey-800"
-    );
-    nameText.textContent = player.displayName.split(",")[1].trim();
-    playerDiv.appendChild(nameText);
-
-    playerDiv.dataset.playerId = player.id;
-    playerDiv.draggable = true;
-    playerDiv.style.setProperty("--player-x", player.percentX + "%");
-    playerDiv.style.setProperty("--player-y", player.percentY + "%");
-    playerDiv.style.left = "var(--player-x)";
-    playerDiv.style.top = "var(--player-y)";
-    playerDiv.addEventListener(
-      "dragstart",
-      App.eventHandler.handleDragStart.bind(App.eventHandler)
-    );
-    playerDiv.addEventListener(
-      "dragend",
-      App.eventHandler.handleDragEnd.bind(App.eventHandler)
-    );
-  }
-
-  updatePlaceholder() {
-    const hasPlayers = this.playerPool.players.length > 0;
-
-    // Reset all styles first
-    this.placeholder.classList.remove(
-      "min-h-20",
-      "border-2",
-      "border-dashed",
-      "border-blue-400",
-      "rounded-lg",
-      "bg-blue-50",
-      "flex",
-      "items-center",
-      "justify-center",
-      "text-blue-600"
-    );
-    this.substitutesList.classList.remove(
-      "border-2",
-      "border-dashed",
-      "border-blue-400",
-      "rounded-lg",
-      "p-2",
-      "bg-blue-50",
-      "min-h-20"
-    );
-
-    if (hasPlayers) {
-      // Players exist on bench
-      this.placeholder.classList.add("hidden");
-      this.substitutesList.classList.add(
-        "border-2",
-        "border-dashed",
-        "print:border-0",
-        "border-blue-400",
-        "rounded-lg",
-        "p-2",
-        "bg-blue-50",
-        "min-h-20"
-      );
-    }
-  }
-  clearViews() {
-    this.substitutesList.innerHTML = "";
-    this.playersContainer
-      .querySelectorAll(".player-position")
-      .forEach((el) => el.remove());
-  }
-  // Check if point is within pitch SVG bounds
-  isPointInPitch(x, y, pitchRect) {
-    // Get SVG dimensions using the helper method
-    const { svgWidth, svgHeight, svgX, svgY } = this.getSvgDimensions(pitchRect);
-
-    // Check if we got valid dimensions
-    if (svgWidth <= 0 || svgHeight <= 0) {
-      console.error('Invalid SVG dimensions');
-      return false;
-    }
-
-    // Check if point is within the SVG area
-    const isInside = x >= svgX && x <= svgX + svgWidth && 
-                    y >= svgY && y <= svgY + svgHeight;
-
-    if (!isInside) {
-      console.log('Drop rejected: outside SVG bounds');
-      return false;
-    }
-
-    // Convert to SVG coordinates (relative to SVG top-left)
-    const svgRelativeX = x - svgX;
-    const svgRelativeY = y - svgY;
-
-    // Additional check: is point within the actual pitch area (excluding border)?
-    // The pitch has a 10px border in the SVG (from pitch.svg)
-    const isOnPitch = svgRelativeX >= 10 && svgRelativeX <= svgWidth - 10 &&
-                      svgRelativeY >= 10 && svgRelativeY <= svgHeight - 10;
-
-    if (!isOnPitch) {
-      console.log('Drop rejected: outside pitch area');
-      return false;
-    }
-
-    return true;
-  }
-  // Helper method to calculate SVG dimensions
-  getSvgDimensions(pitchRect) {
-    try {
-      // Get the actual SVG dimensions from the object element
-      const svgObject = this.pitchContainer.querySelector('object');
-      if (!svgObject) {
-        console.error('SVG object not found');
-        return { svgWidth: 0, svgHeight: 0, svgX: 0, svgY: 0 };
-      }
-
-      // Get the SVG document
-      const svgDoc = svgObject.contentDocument;
-      if (!svgDoc) {
-        console.error('SVG document not loaded');
-        return { svgWidth: 0, svgHeight: 0, svgX: 0, svgY: 0 };
-      }
-
-      // Get the root SVG element
-      const svgElement = svgDoc.documentElement;
-      const svgWidth = svgElement.width.baseVal.value;
-      const svgHeight = svgElement.height.baseVal.value;
-
-      // Calculate position relative to container
-      const svgX = (pitchRect.width - svgWidth) / 2;
-      const svgY = (pitchRect.height - svgHeight) / 2;
-
-      return { svgWidth, svgHeight, svgX, svgY };
-    } catch (error) {
-      console.error('Error getting SVG dimensions:', error);
-      return { svgWidth: 0, svgHeight: 0, svgX: 0, svgY: 0 };
-    }
-  }
-}
-
-class EventHandler {
-  constructor(playerPool, viewManager) {
-    this.playerPool = playerPool;
-    this.viewManager = viewManager;
-    this.activeTouchId = null;
-  }
-
-  handleDragStart(e) {
-    e.dataTransfer.setData("text/plain", e.target.dataset.playerId);
-    e.dataTransfer.effectAllowed = "move";
-    e.target.classList.add("opacity-50");
-  }
-
-  handleDragEnd(e) {
-    e.target.classList.remove("opacity-50");
-  }
-
-  handleTouchStart(e) {
-    e.preventDefault();
-    const touch = e.changedTouches[0];
-    this.activeTouchId = touch.identifier;
-    const playerId = e.target.dataset.playerId;
-
-    // Create a fake drag event for touch
-    const event = new Event("dragstart");
-    event.dataTransfer = {
-      setData: (type, data) => {
-        this.touchData = data;
-      },
-      getData: () => this.touchData,
-      effectAllowed: "move",
-    };
-    event.dataTransfer.setData("text/plain", playerId);
-    e.target.dispatchEvent(event);
-
-    e.target.classList.add("opacity-50");
-  }
-  handleTouchEnd(e) {
-    try {
-      e.preventDefault();
-      const touch = Array.from(e.changedTouches).find(
-        (t) => t.identifier === this.activeTouchId
-      );
-      if (!touch) return;
-
-      const playerId = e.target?.dataset?.playerId;
-      if (!playerId) return;
-
-      const player = this.playerPool.getPlayerById(playerId);
-      if (!player) return;
-
-      // Get touch position relative to SVG
-      const svgRect = this.viewManager.pitchContainer
-        .querySelector("object")
-        .getBoundingClientRect();
-      const touchX = touch.clientX - svgRect.left;
-      const touchY = touch.clientY - svgRect.top;
-
-      // Check if touch ended within SVG bounds
-      if (
-        touchX >= 0 &&
-        touchX <= svgRect.width &&
-        touchY >= 0 &&
-        touchY <= svgRect.height
-      ) {
-        // Move to pitch if space available
-        if (
-          player.location === "pitch" ||
-          this.viewManager.playersContainer.querySelectorAll(".player-position")
-            .length < MAX_PLAYERS
-        ) {
-          player.percentX = (touchX / svgRect.width) * 100;
-          player.percentY = (touchY / svgRect.height) * 100;
-
-          this.playerPool.movePlayer(playerId, "pitch");
-        }
-      }
-    } catch (error) {
-      console.error("Touch error:", error);
-    } finally {
-      e.target?.classList?.remove("opacity-50");
-      this.activeTouchId = null;
-    }
-  }
-}
-
-class PlayerInputHandler {
-  constructor(playerPool, playerInput) {
-    this.playerPool = playerPool;
-    this.playerInput = playerInput;
-  }
-
-  addPlayers() {
-    const input = this.playerInput.value.trim();
-    if (!input) return;
-
-    const lines = input
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line);
-
-    lines.forEach((line) => {
-      const [numberPart, firstName] = line.split(", ");
-      const [number, ...lastNameParts] = numberPart.split(" ");
-      const lastName = lastNameParts.join(" ");
-
-      const player = new Player(number, firstName, lastName);
-
-      // Duplikatprüfung
-      const isDuplicate = this.playerPool.players.some(
-        (p) =>
-          p.number === player.number ||
-          (p.firstName === player.firstName && p.lastName === player.lastName)
-      );
-
-      if (!isDuplicate) {
-        this.playerPool.addPlayer(player);
-      }
-    });
-
-    this.playerInput.value = "";
-  }
-}
 
 // Main application instance
-const App = {
-  playerPool: null,
-  viewManager: null,
-  uiManager: null,
-  eventHandler: null,
-  playerInputHandler: null,
+export const App = {
+  // UI Action Handlers
+  actions: {
+    addPlayers: () => {
+      try {
+        App.components.uiManager.playerInputHandler.addPlayers();
+      } catch (error) {
+        console.error('Error adding players:', error);
+      }
+    },
+    
+    printPitch: () => {
+      try {
+        App.components.uiManager?.printPitch();
+      } catch (error) {
+        console.error('Error printing pitch:', error);
+      }
+    },
+    
+    openPlayerDialog: () => {
+      try {
+        App.components.uiManager?.openPlayerDialog();
+      } catch (error) {
+        console.error('Error opening dialog:', error);
+      }
+    },
+    
+    closePlayerDialog: () => {
+      try {
+        App.components.uiManager?.closePlayerDialog();
+      } catch (error) {
+        console.error('Error closing dialog:', error);
+      }
+    },
+    
+    addPlayersAndClose: () => {
+      try {
+        App.components.uiManager?.addPlayersAndClose();
+        // After adding players, also update tactic info if a tactic is selected
+        const currentTactic = App.components.tacticManager?.getCurrentTactic();
+        if (currentTactic) {
+            App.displayTacticInformation(currentTactic);
+        }
+      } catch (error) {
+        console.error('Error adding players:', error);
+      }
+    },
+    showExtendedTacticInfo: () => {
+      const currentTactic = App.components.tacticManager?.getCurrentTactic();
+      // Nur Modal anzeigen, wenn eine erweiterte Beschreibung vorhanden ist
+      if (currentTactic && currentTactic.extendedDescription && tacticInfoModal && tacticModalTitle && tacticModalExtendedDescription) {
+        tacticModalTitle.textContent = currentTactic.name;
+        tacticModalExtendedDescription.innerHTML = currentTactic.extendedDescription.replace(/\n/g, '<br>'); // Preserve line breaks
+        tacticInfoModal.classList.remove('hidden');
+      }
+    },
+    closeExtendedTacticInfoModal: () => {
+      if (tacticInfoModal) {
+        tacticInfoModal.classList.add('hidden');
+      }
+    }
+  },
 
+  // Component references
+  components: {
+    playerPool: null,
+    viewManager: null, 
+    uiManager: null,
+    eventHandler: null,
+    playerInputHandler: null,
+    tacticManager: null
+  },
+
+  // State
+  state: {
+    initialized: false,
+    currentGameType: 7, // Default game type
+    currentSelectedTactic: null // To store the currently selected tactic object
+  },
+  
+  // Initialize the application
   init() {
-    this.playerPool = new PlayerPool();
-    this.viewManager = new ViewManager(this.playerPool);
-    this.eventHandler = new EventHandler(this.playerPool, this.viewManager);
-    this.playerInputHandler = new PlayerInputHandler(
-      this.playerPool,
-      playerInput
-    );
-    this.uiManager = new UIManager(
-      playerDialog,
-      playerInput,
-      this.playerInputHandler
-    );
+    // Set up global reference to avoid circular imports
+    window.AppRef = this;
 
+    // Step 1: Create core components
+    this.components.playerPool = new PlayerPool();
+    this.components.viewManager = new ViewManager(this.components.playerPool);
+    
+    // Connect components
+    this.components.playerPool.init(this.components.viewManager);
+    this.components.viewManager.init(this);
+    
+    // Step 2: Create dependent components
+    this.components.tacticManager = new TacticManager();
+    this.components.playerInputHandler = new PlayerInputHandler(this.components.playerPool, playerInput);
+    this.components.uiManager = new UIManager(playerDialog, playerInput, this.components.playerInputHandler);
+    this.components.eventHandler = new EventHandler(this.components.playerPool, this.components.viewManager);
+    
+    // Also store components directly on App for backward compatibility/easier access
+    this.playerPool = this.components.playerPool;
+    this.viewManager = this.components.viewManager;
+    this.tacticManager = this.components.tacticManager;
+    this.playerInputHandler = this.components.playerInputHandler;
+    this.uiManager = this.components.uiManager;
+    this.eventHandler = this.components.eventHandler;
+    
+    // Set tactic change callback
+    this.components.tacticManager.onTacticChange = () => {
+      this.components.playerPool.updateView();
+      // Also update displayed tactic info when tactic changes programmatically (e.g. via game type change)
+      const newCurrentTactic = this.components.tacticManager.getCurrentTactic();
+      if (newCurrentTactic) {
+        this.displayTacticInformation(newCurrentTactic);
+        this.state.currentSelectedTactic = newCurrentTactic;
+      }
+    };
+
+    // Initial setup
+    this.initializeDefaultSetup();
+  },
+
+  initializeDefaultSetup() {
+    // Set up tactic options for the default game type (7-a-side)
+    const defaultGameType = 7;
+    
+    // Ensure the corresponding game type button is marked as active
+    document.querySelectorAll('.game-type-btn').forEach(btn => {
+      const isActive = btn.dataset.type === `${defaultGameType}er`;
+      btn.classList.toggle('active', isActive);
+    });
+    
+    // Load tactics for the default game type
+    this.updateTacticOptions(defaultGameType);
+
+    // Setup event listeners and initial view state (only once)
     this.setupEventListeners();
     this.viewManager.updatePlaceholder();
-    handleResize();
+    this.viewManager.handleResize();
+    
+    // Display info for the initially selected tactic
+    const initialTactic = this.components.tacticManager.getCurrentTactic();
+    if (initialTactic) {
+        this.displayTacticInformation(initialTactic);
+        this.state.currentSelectedTactic = initialTactic;
+    }
+  },
+
+  displayTacticInformation(tactic) {
+    if (!tacticInfoCompact || !tacticInfoDescription || !tacticInfoBulletpoints) {
+        // console.warn("Tactic info display elements not found."); // Optional warning
+        return;
+    }
+
+    if (tactic && tactic.description && tactic.bulletpoints) {
+        tacticInfoDescription.textContent = tactic.description;
+        tacticInfoBulletpoints.innerHTML = ''; // Clear previous points
+        tactic.bulletpoints.forEach(point => {
+            const li = document.createElement('li');
+            li.textContent = point;
+            tacticInfoBulletpoints.appendChild(li);
+        });
+        tacticInfoCompact.style.display = 'block';
+        // Info-Icon nur anzeigen, wenn eine erweiterte Beschreibung vorhanden ist
+        if (tacticInfoIcon) {
+            if (tactic.extendedDescription) {
+                tacticInfoIcon.style.display = 'inline-block'; 
+            } else {
+                tacticInfoIcon.style.display = 'none';
+            }
+        }
+    } else {
+        tacticInfoCompact.style.display = 'none';
+        if (tacticInfoIcon) tacticInfoIcon.style.display = 'none'; // Hide icon if no tactic/info
+    }
+  },
+  
+  updateTacticOptions(playerCount) {
+    const select = document.getElementById('tactic-select');
+    if (!select) return;
+    
+    // Set the game type in TacticManager first
+    const success = this.components.tacticManager.setGameType(playerCount);
+    if (!success) {
+      return;
+    }
+    
+    // Then update the dropdown options
+    select.innerHTML = ''; // Clear existing options
+    
+    const tactics = this.components.tacticManager.getTacticsForCurrentGameType();
+    if (tactics.length === 0) {
+      return;
+    }
+
+    // Populate tactic select dropdown
+    tactics.forEach(tactic => {
+      const option = new Option(
+        tactic.name.replace(`${playerCount}er `, ''), // Display simplified name
+        tactic.name
+      );
+      select.add(option);
+    });
+    
+    // Remove excess players if any, but don't redistribute automatically here
+    this.checkAndRemoveExcessPlayers(playerCount);
+    
+    // Update the view with the potentially modified player pool
+    this.components.playerPool.updateView();
+    
+    // After updating options, display info for the new default tactic
+    const newDefaultTactic = this.components.tacticManager.getCurrentTactic();
+    if (newDefaultTactic) {
+        this.displayTacticInformation(newDefaultTactic);
+        this.state.currentSelectedTactic = newDefaultTactic;
+
+        // Ensure the tactic select dropdown reflects this default tactic
+        if(select.options.length > 0) {
+            let foundSelected = false;
+            for(let i=0; i < select.options.length; i++) {
+                if(select.options[i].value === newDefaultTactic.name) {
+                    select.selectedIndex = i;
+                    foundSelected = true;
+                    break;
+                }
+            }
+            if (!foundSelected) select.selectedIndex = 0; // Fallback to first if not found
+        }
+    } else {
+        this.displayTacticInformation(null); // Hide info if no tactic
+        this.state.currentSelectedTactic = null;
+    }
+  },
+  
+  // Check and remove excess players from the pitch
+  checkAndRemoveExcessPlayers(maxPlayers) {
+    if (!this.components.playerPool || !this.components.playerPool.players) {
+      return;
+    }
+    
+    const pitchPlayers = this.components.playerPool.getPitchPlayers();
+    
+    if (pitchPlayers.length === 0) {
+      return;
+    }
+    
+    // Move excess players to the bench
+    if (pitchPlayers.length > maxPlayers) {
+      
+      // Sort players by their Y position on the pitch (bottom to top)
+      const sortedPlayers = [...pitchPlayers].sort((a, b) => b.percentY - a.percentY);
+      
+      // Move players to bench starting from the ones "lowest" on the pitch visually
+      for (let i = maxPlayers; i < sortedPlayers.length; i++) {
+        const player = sortedPlayers[i];
+        player.location = "bench";
+      }
+    } 
   },
 
   setupEventListeners() {
-    // Bench drop event only (without highlighting)
-    this.viewManager.substitutesList.addEventListener("dragover", (e) => {
+    // Game type selection buttons
+    document.querySelectorAll('.game-type-btn').forEach(btn => {
+      // Clone and replace to remove old listeners, ensuring correct 'this' context
+      const newBtn = btn.cloneNode(true);
+      btn.parentNode.replaceChild(newBtn, btn);
+      
+      newBtn.addEventListener('click', (e) => {
+        // Update active button styling
+        document.querySelectorAll('.game-type-btn').forEach(b => 
+          b.classList.toggle('active', b === e.currentTarget)
+        );
+        
+        const gameType = parseInt(e.currentTarget.dataset.type.replace('er', ''));
+        // Call updateTacticOptions with the correct 'this' context (App object)
+        this.updateTacticOptions.call(window.AppRef, gameType);
+      });
+    });
+
+    // Tactic selection change
+    document.getElementById('tactic-select').addEventListener('change', (e) => {
+      const tacticName = e.target.value;
+      this.components.tacticManager.setTactic(tacticName, this.components.playerPool);
+      // Display info for the newly selected tactic
+      const selectedTactic = this.components.tacticManager.getCurrentTactic();
+      if (selectedTactic) {
+          this.displayTacticInformation(selectedTactic);
+          this.state.currentSelectedTactic = selectedTactic;
+      }
+    });
+
+    // Listener for the tactic info icon
+    if (tacticInfoIcon) {
+        tacticInfoIcon.addEventListener('click', this.actions.showExtendedTacticInfo);
+    }
+
+    // Listener for the modal close button
+    if (tacticModalCloseBtn) {
+        tacticModalCloseBtn.addEventListener('click', this.actions.closeExtendedTacticInfoModal);
+    }
+
+    // Close modal if clicking outside of it (on the overlay)
+    if (tacticInfoModal) {
+        tacticInfoModal.addEventListener('click', (event) => {
+            // Check if the click is directly on the modal overlay (the first child of the modal container)
+            if (event.target === tacticInfoModal) {
+                this.actions.closeExtendedTacticInfoModal();
+            }
+        });
+    }
+
+    // Bench drop zone events
+    this.components.viewManager.substitutesList.addEventListener("dragover", (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
     });
 
-    this.viewManager.substitutesList.addEventListener("drop", (e) => {
+    this.components.viewManager.substitutesList.addEventListener("drop", (e) => {
       e.preventDefault();
       const playerId = e.dataTransfer.getData("text/plain");
-      this.playerPool.movePlayer(playerId, "bench");
-      this.viewManager.substitutesList.classList.remove("bg-gray-100");
+      this.components.playerPool.movePlayer(playerId, "bench");
+      this.components.viewManager.substitutesList.classList.remove("bg-gray-100"); // Remove highlight
     });
 
-    // Pitch drag events
-    this.viewManager.pitchContainer.addEventListener("dragover", (e) => {
+    // Pitch drag and drop events
+    this.components.viewManager.pitchContainer.addEventListener("dragover", (e) => {
       e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-    });
-    this.viewManager.pitchContainer.addEventListener("drop", (e) => {
-      e.preventDefault();
-      const playerId = e.dataTransfer.getData("text/plain");
-      const player = this.playerPool.getPlayerById(playerId);
-
-      if (!player) return;
-
-      // Get SVG dimensions (600x900 viewBox)
-      const svgRect = this.viewManager.pitchContainer
-        .querySelector("object")
-        .getBoundingClientRect();
+      
+      const svgObject = this.components.viewManager.pitchContainer.querySelector("object");
+      if (!svgObject) return;
+      const svgRect = svgObject.getBoundingClientRect();
+      
       const mouseX = e.clientX - svgRect.left;
       const mouseY = e.clientY - svgRect.top;
 
-      console.log("Testing drop at:", { mouseX, mouseY });
-
-      // Check if drop is within SVG bounds
-      if (
-        mouseX < 0 ||
-        mouseX > svgRect.width ||
-        mouseY < 0 ||
-        mouseY > svgRect.height
-      ) {
-        document
-          .querySelector(`[data-player-id="${playerId}"]`)
-          .classList.remove("opacity-50");
-        console.log("Drop rejected: outside SVG bounds");
-        return;
-      }
-
-      // Calculate percentages relative to SVG dimensions
       const percentX = (mouseX / svgRect.width) * 100;
       const percentY = (mouseY / svgRect.height) * 100;
 
-      player.percentX = percentX;
-      player.percentY = percentY;
-
-      const playerEl = document.querySelector(`[data-player-id="${playerId}"]`);
-      if (playerEl) {
-        console.log("Setting position:", { percentX, percentY });
-        playerEl.style.setProperty("--player-x", percentX + "%");
-        playerEl.style.setProperty("--player-y", percentY + "%");
-        playerEl.style.left = "var(--player-x)";
-        playerEl.style.top = "var(--player-y)";
-        playerEl.style.transform = "translate(-50%, -50%)";
+      if (!this.components.viewManager.isPointInPitch(mouseX, mouseY, svgRect)) {
+        e.dataTransfer.dropEffect = "none"; // Disallow drop outside pitch
+        return;
       }
 
-      if (
-        player.location === "pitch" ||
-        this.viewManager.playersContainer.querySelectorAll(".player-position")
-          .length < MAX_PLAYERS
-      ) {
-        this.playerPool.movePlayer(playerId, "pitch");
+      const positionMarkers = this.components.tacticManager.getPositionMarkers();
+      if (positionMarkers.length > 0) { // Tactic is active
+        const highlightResult = this.components.viewManager.highlightClosestMarker(percentX, percentY);
+        e.dataTransfer.dropEffect = (highlightResult && highlightResult.shouldSnap) ? "move" : "none";
+      } else { // Free placement
+        e.dataTransfer.dropEffect = "move";
       }
-
-      document
-        .querySelector(`[data-player-id="${playerId}"]`)
-        .classList.remove("opacity-50");
     });
-  },
+
+    this.components.viewManager.pitchContainer.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const playerId = e.dataTransfer.getData("text/plain");
+      const player = this.components.playerPool.getPlayerById(playerId);
+
+      const draggedElement = document.querySelector(`[data-player-id="${playerId}"]`);
+
+      if (!player) {
+        document.querySelectorAll('[data-player-id].opacity-50').forEach(el => el.classList.remove('opacity-50'));
+        return;
+      }
+      
+      const svgObject = this.components.viewManager.pitchContainer.querySelector("object");
+      if (!svgObject) {
+          draggedElement?.classList.remove("opacity-50");
+          return;
+      }
+      const svgRect = svgObject.getBoundingClientRect();
+      const mouseX = e.clientX - svgRect.left;
+      const mouseY = e.clientY - svgRect.top;
+
+      if (!this.components.viewManager.isPointInPitch(mouseX, mouseY, svgRect)) {
+        draggedElement?.classList.remove("opacity-50");
+        return;
+      }
+
+      const percentX = (mouseX / svgRect.width) * 100;
+      const percentY = (mouseY / svgRect.height) * 100;
+
+      const positionMarkers = this.components.tacticManager.getPositionMarkers();
+      const isFreePlacement = positionMarkers.length === 0;
+      const gameType = this.components.tacticManager.getCurrentGameType();
+      const maxPlayersOnPitch = gameType || 11; // Default to 11 if gameType is not set
+      const currentPitchPlayerCount = this.components.playerPool.getPitchPlayers().length;
+
+      // Prevent adding more than maxPlayers in free placement mode if player comes from bench
+      if (isFreePlacement && player.location !== "pitch" && currentPitchPlayerCount >= maxPlayersOnPitch) {
+        draggedElement?.classList.remove("opacity-50");
+        return;
+      }
+
+      if (!isFreePlacement) { // Tactic is active
+        const highlightResult = this.components.viewManager.highlightClosestMarker(percentX, percentY);
+        
+        if (!highlightResult || !highlightResult.shouldSnap) {
+          document.querySelectorAll(`[data-player-id="${playerId}"]`).forEach(el => {
+            el.classList.remove("opacity-50", "dragging");
+          });
+          return;
+        }
+        
+        const targetX = highlightResult.x;
+        const targetY = highlightResult.y;
+        
+        const existingPlayerAtTarget = this.components.playerPool.getPitchPlayers().find(p => 
+          Math.abs(p.percentX - targetX) < 0.1 && 
+          Math.abs(p.percentY - targetY) < 0.1 &&
+          p.id !== playerId 
+        );
+
+        if (existingPlayerAtTarget) { // Swap players
+          const oldX = player.percentX;
+          const oldY = player.percentY;
+          const wasOnPitch = player.location === "pitch";
+          
+          player.percentX = targetX;
+          player.percentY = targetY;
+          player.location = "pitch";
+          
+          if (wasOnPitch) {
+            existingPlayerAtTarget.percentX = oldX;
+            existingPlayerAtTarget.percentY = oldY;
+          } else {
+            existingPlayerAtTarget.location = "bench"; // Move existing player to bench
+          }
+          this.components.playerPool.updateView();
+        } else { // Move to empty tactic position
+          player.percentX = targetX;
+          player.percentY = targetY;
+          this.components.playerPool.movePlayer(playerId, "pitch");
+        }
+      } else { // Free placement mode
+        player.percentX = percentX;
+        player.percentY = percentY;
+        this.components.playerPool.movePlayer(playerId, "pitch");
+      }
+
+      draggedElement?.classList.remove("opacity-50");
+      
+      // Reset all marker highlights
+      this.components.viewManager.playersContainer.querySelectorAll('.position-marker')
+        .forEach(marker => {
+          marker.classList.remove('border-blue-600', 'border-4', 'bg-blue-100/30', 'highlighted');
+          marker.classList.add('border-blue-600', 'border-2');
+        });
+    });
+  }
 };
 
-class UIManager {
-  constructor(playerDialog, playerInput, playerInputHandler) {
-    this.playerDialog = playerDialog;
-    this.playerInput = playerInput;
-    this.playerInputHandler = playerInputHandler;
-  }
-
-  openPlayerDialog() {
-    this.playerDialog.classList.remove("hidden");
-    this.playerInput.focus();
-  }
-
-  closePlayerDialog() {
-    this.playerDialog.classList.add("hidden");
-    this.playerInput.value = "";
-  }
-
-  addPlayersAndClose() {
-    this.playerInputHandler.addPlayers();
-    this.closePlayerDialog();
-  }
-
-  printPitch() {
-    window.print();
-
-  }
-}
-
-function handleResize() {
-  if (!App.playerPool || window.matchMedia("print").matches) return;
-
-  const svgRect = App.viewManager.pitchContainer
-    .querySelector("object")
-    .getBoundingClientRect();
-
-  App.playerPool.players.forEach((player) => {
-    if (player.location === "pitch") {
-      const playerEl = document.querySelector(
-        `[data-player-id="${player.id}"]`
-      );
-      if (playerEl) {
-        playerEl.style.setProperty("--player-x", player.percentX + "%");
-        playerEl.style.setProperty("--player-y", player.percentY + "%");
+// Simplified synchronous initialization
+function initializeApp() {
+  if (window.AppInitialized) return; // Prevent multiple initializations
+  
+  // Check if required DOM elements exist
+  const requiredElements = [
+      'player-dialog', 'player-input', 'pitch-container', 'add-players-btn', 
+      'print-btn', 'cancel-btn', 'add-close-btn', 'tactic-select',
+      // Add IDs for tactic info display
+      'tactic-info-compact', 'tactic-info-description', 'tactic-info-bulletpoints',
+      'tactic-info-icon', 'tactic-info-modal', 'tactic-modal-title',
+      'tactic-modal-extended-description', 'tactic-modal-close-btn'
+    ];
+  for (const id of requiredElements) {
+    if (!document.getElementById(id)) {
+      // Allow some to be optional for now, or provide a more graceful fallback.
+      // For critical ones, error out.
+      const critical = ['player-dialog', 'player-input', 'pitch-container', 'add-players-btn', 'tactic-select'];
+      if (critical.includes(id)) {
+        console.error(`Initialization Error: Missing critical DOM element with ID: ${id}`);
+        return; 
+      } else {
+        // console.warn(`Optional DOM element with ID: ${id} not found. Some UI features might be limited.`);
       }
     }
-  });
-  App.playerPool.updateView();
+  }
+
+  try {
+    App.init(); // Initialize the main application
+    window.AppInitialized = true;
+
+    // Set up global event listeners for UI controls
+    document.getElementById('add-players-btn').addEventListener('click', App.actions.openPlayerDialog);
+    document.getElementById('print-btn').addEventListener('click', App.actions.printPitch);
+    document.getElementById('cancel-btn').addEventListener('click', App.actions.closePlayerDialog);
+    document.getElementById('add-close-btn').addEventListener('click', App.actions.addPlayersAndClose);
+  } catch (error) {
+    console.error('App initialization failed:', error);
+  }
 }
 
-// Initialize application
-document.addEventListener("DOMContentLoaded", () => {
-  App.init();
+// Start the application when the DOM is fully loaded
+document.addEventListener('DOMContentLoaded', initializeApp);
+
+// Handle window resize events to adjust view elements
+window.addEventListener("resize", () => {
+  if (window.AppRef?.viewManager) {
+    window.AppRef.viewManager.handleResize();
+  }
 });
 
-window.addEventListener("resize", handleResize);
-
-// Globale Funktionen
-window.addPlayers = () => App.uiManager.playerInputHandler.addPlayers();
-window.printPitch = () => App.uiManager.printPitch();
-window.openPlayerDialog = () => App.uiManager.openPlayerDialog();
-window.closePlayerDialog = () => App.uiManager.closePlayerDialog();
-window.addPlayersAndClose = () => App.uiManager.addPlayersAndClose();
+// Assign actions to window for backward compatibility or global access if needed
+window.addPlayers = App.actions.addPlayers;
+window.printPitch = App.actions.printPitch;
+window.openPlayerDialog = App.actions.openPlayerDialog;
+window.closePlayerDialog = App.actions.closePlayerDialog;
+window.addPlayersAndClose = App.actions.addPlayersAndClose;
