@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fußball Aufstellung</title>
+  <link href="./src/styles/tailwind.css" rel="stylesheet">
+  <style>
+    /* Player positioning for both screen and print */
+    .player-position {
+      position: absolute;
+      left: var(--player-x);
+      top: var(--player-y);
+      transform: translate(-50%, -50%) !important;
+    }
+
+    /* Nur die Stile, die nicht über Tailwind umsetzbar sind */
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+
+
+      /* Navigation unten ausblenden */
+      .pagination {
+        display: none !important;
+      }
+
+      /* Spielermarker */
+      .player-position {
+        left: var(--player-x) !important;
+        top: var(--player-y) !important;
+      }
+      
+      /* Explizite Reihenfolge für den Druckmodus */
+      .print-order-1 {
+        order: 1 !important;
+      }
+      
+      .print-order-2 {
+        order: 2 !important;
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-white print:p-0 print:m-0">
+  <header
+    class="bg-green-700 text-white p-4 shadow-md print:shadow-none print:bg-white print:text-black print:p-2 print:border-gray-300 print:flex print:items-center print:justify-center print:m-0">
+    <h1 class="text-2xl font-bold text-center print:text-xl print:m-2">
+      Aufstellung
+    </h1>
+  </header>
+  <div
+    class="mx-auto p-4 flex flex-col lg:flex-row lg:items-start gap-4 min-h-[calc(100vh-5rem)] print:p-0 print:m-0 print:mx-auto print:flex-col print:gap-0">
+    
+    <!-- Linke Spalte mit Aktionen und Ersatzbank -->
+    <div class="w-full lg:w-72 flex flex-col gap-4 print-order-2">
+      <!-- Actions panel -->
+      <div class="bg-white rounded-xl shadow-lg p-4 hover:bg-gray-50 transition-colors duration-200 print:hidden">
+        <h2 class="text-xl font-bold text-gray-800 border-b pb-2">
+          Aktionen
+        </h2>
+        <div class="mt-4 flex flex-wrap justify-center gap-3">
+          <button
+            class="px-6 lg:w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg shadow transition-all duration-200 hover:shadow-md"
+            onclick="openPlayerDialog()">
+            Spieler hinzufügen
+          </button>
+          <button
+            class="px-6 lg:w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg shadow transition-all duration-200 hover:shadow-md"
+            onclick="printPitch()">
+            Drucken
+          </button>
+        </div>
+      </div>
+
+      <!-- Substitutes panel -->
+      <div class="bg-white rounded-xl shadow-lg p-4 hover:bg-gray-50 transition-colors duration-200 print:shadow-none print:w-4/5 print:mx-auto print:mt-1 print:p-2">
+        <h2 class="text-xl font-bold text-gray-800 border-b pb-2 print:text-lg print:pb-1">
+          Ersatzbank
+        </h2>
+        <ul id="substitutes" class="mt-4 flex flex-wrap gap-2 w-full print:mt-1 print:gap-1 print:justify-start">
+          <!-- Player list will be generated here -->
+        </ul>
+        <p id="substitutes-placeholder" class="text-gray-500 text-sm text-center mt-4 lg:mt-8 px-4 print:hidden">
+          Hier ist es leer - Spieler hinzufügen über den Button
+        </p>
+      </div>
+    </div>
+     
+    <!-- Football pitch -->
+    <div class="flex-1 flex lg:order-none mb-4 lg:mb-0 print-order-1 print:justify-center">
+      <div class="relative flex-1 w-full print:bg-white print:w-auto print:flex-initial print:h-[850px]" id="pitch-container">
+        <object id="pitch" data="src/assets/pitch.svg" type="image/svg+xml"
+          class="block w-full lg:w-auto h-auto print:h-[850px] aspect-[2/3] lg:max-h-[calc(100vh-6rem)]"></object>
+        <div id="players-container" class="absolute w-full print:w-full lg:w-auto aspect-[2/3] lg:max-h-[calc(100vh-6rem)] inset-0 print:h-[850px]">
+        </div>
+      </div>
+    </div>
+
+    <!-- Overlay dialog for adding players -->
+    <div id="player-dialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+      <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">
+          Spieler hinzufügen
+        </h2>
+        <textarea id="player-input"
+          class="w-full border border-gray-300 rounded-lg p-3 mb-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder="Nummer Nachname, Vorname (z.B. 10 Müller, Thomas)" rows="5"></textarea>
+        <div class="flex justify-end space-x-3">
+          <button class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-lg transition-colors"
+            onclick="closePlayerDialog()">
+            Abbrechen
+          </button>
+          <button class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
+            onclick="addPlayersAndClose()">
+            Hinzufügen
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="src/js/script.js"></script>
+</body>
+
+</html>
