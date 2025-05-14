@@ -1,8 +1,8 @@
 <script setup>
   import { ref, computed } from "vue";
-  import { useAppStore } from "@/stores/appStore";
+  import { useTacticManager } from "@/composables/useTacticManager";
 
-  const appStore = useAppStore();
+  const tacticManager = useTacticManager();
   const showTacticInfo = ref(false);
 
   const gameTypes = [
@@ -11,19 +11,16 @@
     { value: 11, label: "11er" },
   ];
 
-  const currentTactic = computed(() =>
-    appStore.tacticManager.getCurrentTactic()
-  );
-  const tactics = computed(() =>
-    appStore.tacticManager.getTacticsForCurrentGameType()
-  );
+  const currentTactic = computed(() => tacticManager.getCurrentTactic());
+  const tactics = computed(() => tacticManager.getTacticsForCurrentGameType());
+  const currentGameType = computed(() => tacticManager.getCurrentGameType());
 
   function setGameType(type) {
-    appStore.tacticManager.setGameType(type);
+    tacticManager.setGameType(type);
   }
 
   function setTactic(tacticName) {
-    appStore.tacticManager.setTactic(tacticName);
+    tacticManager.setTactic(tacticName);
   }
 </script>
 
@@ -41,8 +38,7 @@
           @click="setGameType(type.value)"
           class="flex-1 py-2 px-3 rounded-md transition-colors"
           :class="{
-            'bg-blue-500 text-white':
-              appStore.tacticManager.currentGameType === type.value,
+            'active': currentGameType === type.value
           }"
         >
           {{ type.label }}
@@ -56,7 +52,7 @@
         >
         <div class="flex items-center">
           <select
-            v-model="currentTactic.name"
+            :value="currentTactic?.name || ''"
             @change="setTactic($event.target.value)"
             class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
           >
@@ -65,12 +61,7 @@
               :key="tactic.name"
               :value="tactic.name"
             >
-              {{
-                tactic.name.replace(
-                  `${appStore.tacticManager.currentGameType}er `,
-                  ""
-                )
-              }}
+              {{ tactic.name }}
             </option>
           </select>
 
@@ -105,7 +96,7 @@
           <p class="text-sm font-semibold text-gray-800">
             {{ currentTactic.description }}
           </p>
-          <ul class="list-disc list-inside text-xs text-gray-600 mt-1">
+          <ul class="list-disc list-inside text-sm text-gray-600 mt-1">
             <li
               v-for="(point, index) in currentTactic.bulletpoints"
               :key="index"
@@ -118,13 +109,13 @@
 
       <button
         @click="$emit('openPlayerDialog')"
-        class="px-6 lg:w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg shadow transition-all duration-200 hover:shadow-md"
+        class="w-full px-6 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg shadow transition-all duration-200 hover:shadow-md"
       >
         Spieler hinzufügen
       </button>
       <button
         @click="$emit('print')"
-        class="px-6 lg:w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg shadow transition-all duration-200 hover:shadow-md"
+        class="w-full px-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg shadow transition-all duration-200 hover:shadow-md"
       >
         Drucken
       </button>

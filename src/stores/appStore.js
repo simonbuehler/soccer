@@ -1,48 +1,16 @@
 import { defineStore } from "pinia";
-import { ref, computed } from "vue";
+import { ref } from "vue";
 
 export const useAppStore = defineStore("app", () => {
-  const playerPool = ref(null);
-  const tacticManager = ref(null);
-  const viewManager = ref(null);
-  const eventHandler = ref(null);
+  // Reactive state only
+  const players = ref([]);
   const currentTactic = ref(null);
-  const gameType = ref("7er");
-
-  const positionMarkers = computed(() => {
-    return tacticManager.value?.getPositionMarkers() || [];
-  });
-
-  function init() {
-    // Initialize as singletons with dependency injection
-    playerPool.value = usePlayerPool({ appStore: this });
-    tacticManager.value = useTacticManager({ appStore: this });
-    viewManager.value = useViewManager();
-    eventHandler.value = useEventHandler({
-      playerPool: playerPool.value,
-      viewManager: viewManager.value,
-    });
-  }
-
-  function setTactic(tactic) {
-    currentTactic.value = tactic;
-  }
-
-  function setGameType(type) {
-    gameType.value = type;
-    tacticManager.value?.setGameType(type);
-  }
+  const gameType = ref(7); // Numeric value
+  // availableTactics removed - managed by TacticManager
 
   return {
-    playerPool,
-    tacticManager,
-    viewManager,
-    eventHandler,
+    players,
     currentTactic,
-    gameType,
-    positionMarkers,
-    init,
-    setTactic,
-    setGameType,
+    gameType
   };
 });

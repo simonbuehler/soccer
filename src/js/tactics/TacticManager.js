@@ -2,10 +2,10 @@ import { TACTICS } from './allTactics.js';
 
 export class TacticManager {
   constructor() {
-    this.availableTactics = TACTICS;
-    // Initialize with a default tactic, e.g., for 7 players, "Frei" (free) formation
-    this.currentTactic = this.availableTactics.find(t => t.name === "7er Frei"); 
     this.currentGameType = 7; // Default game type (7, 9, or 11 players)
+    this.availableTactics = TACTICS[this.currentGameType];
+    // Initialize with a default tactic, e.g., for 7 players, "Frei" (free) formation
+    this.currentTactic = this.availableTactics.find(t => t.name === "Frei"); 
     this.onTacticChange = null; // Callback for when the tactic changes
   }
 
@@ -15,10 +15,11 @@ export class TacticManager {
     }
     
     this.currentGameType = playerCount;
+    this.availableTactics = TACTICS[playerCount];
     
     // Find default "Frei" (free) tactic for this player count
     const defaultTactic = this.availableTactics.find(t => 
-      t.playerCount === playerCount && t.name.includes("Frei")
+      t.name.includes("Frei")
     );
     
     if (defaultTactic) {
@@ -38,9 +39,7 @@ export class TacticManager {
   }
 
   getTacticsForCurrentGameType() {
-    return this.availableTactics.filter(t => 
-      t.playerCount === this.currentGameType
-    );
+    return this.availableTactics;
   }
 
   setTactic(tacticName, playerPool) {
@@ -61,10 +60,12 @@ export class TacticManager {
   }
 
   getPositionMarkers() {
-    if (!this.currentTactic?.positions) return [];
+    if (!this.currentTactic?.positions?.length) return [];
     // Add isRequired flag to markers unless it's a "Frei" (free) formation
     return this.currentTactic.positions.map(pos => ({
-      ...pos,
+      xPercent: pos.xPercent || 0,
+      yPercent: pos.yPercent || 0,
+      role: pos.role || '',
       isRequired: !this.currentTactic.name.includes("Frei")
     }));
   }

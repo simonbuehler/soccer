@@ -1,102 +1,181 @@
-let instance = null;
+import { useAppStore } from "@/stores/appStore";
+import { markRaw, ref } from "vue";
 
-export function usePlayerPool(dependencies = {}) {
-  if (instance) return instance;
+export function usePlayerPool() {
+  const store = useAppStore();
+  const draggedPlayer = ref(null);
 
-  const { appStore } = dependencies;
-  const players = ref([]);
-  const viewManager = ref(null);
+  function setDraggedPlayer(playerId) {
+    draggedPlayer.value = store.players.find(p => p.id === playerId);
+  }
 
-  function init(manager) {
-    viewManager.value = manager;
-    // Initialize with default players if empty
-    if (players.value.length === 0) {
-      // Default initialization logic
-    }
+  function getDraggedPlayer() {
+    return draggedPlayer.value;
   }
 
   function addPlayer(player) {
-    // Check for name conflicts
-    const sameFirstNamePlayers = players.value.filter(
-      (p) =>
-        p.firstName.value.split(" ")[0] === player.firstName.value.split(" ")[0]
+    console.log('Adding player:', player); // Debug log
+    
+    // Duplicate check
+    const duplicatePlayer = store.players.find(p =>
+      p.number === player.number ||
+      (p.firstName === player.firstName &&
+        p.lastName === player.lastName &&
+        player.lastName !== "")
+    );
+
+    if (duplicatePlayer) {
+      console.log('Duplicate player found:', duplicatePlayer);
+      return false;
+    }
+
+    // Name conflict resolution
+    const sameFirstNamePlayers = store.players.filter(
+      p => p.firstName === player.firstName
     );
 
     if (sameFirstNamePlayers.length > 0) {
+      const sameInitial = player.lastName.charAt(0).toUpperCase();
       const sameInitialPlayers = sameFirstNamePlayers.filter(
-        (p) =>
-          p.lastName.value.charAt(0).toUpperCase() ===
-          player.lastName.value.charAt(0).toUpperCase()
+        p => p.lastName.charAt(0).toUpperCase() === sameInitial
       );
 
-      if (sameInitialPlayers.length > 0) {
-        sameInitialPlayers.forEach((p) =>
-          p.updateDisplayName({ showLastName: true })
+      const updateDisplayNames = (players, format) => {
+        players.forEach(p => {
+          p.displayName = format(p);
+        });
+        return format(player);
+      };
+
+      player.displayName = sameInitialPlayers.length > 0
+        ? updateDisplayNames(
+          sameInitialPlayers,
+          p => `${p.number}, ${p.firstName} ${p.lastName}`
+        )
+        : updateDisplayNames(
+          sameFirstNamePlayers,
+          p => `${p.number}, ${p.firstName} ${p.lastName.charAt(0).toUpperCase()}.`
         );
-        player.updateDisplayName({ showLastName: true });
-      } else {
-        sameFirstNamePlayers.forEach((p) =>
-          p.updateDisplayName({ showInitial: true })
-        );
-        player.updateDisplayName({ showInitial: true });
+    } else {
+      player.displayName = `${player.number}, ${player.firstName}`;
+    }
+
+    const playerToAdd = markRaw({
+      ...player,
+      id: player.id || `player-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      location: "bench" // Default to bench
+    });
+
+    store.players.push(playerToAdd);
+    console.log('Player added successfully:', playerToAdd);
+    return true;
+  }
+
+  function movePlayer(playerId, options) {
+    const player = store.players.find(p => p.id === playerId);
+    if (!player) return;
+
+    console.log(`Moving player ${playerId} to:`, options);
+    
+    if (options.location) {
+      player.location = options.location;
+    }
+    if (options.x !== undefined) {
+      player.percentX = options.x;
+    }
+    if (options.y !== undefined) {
+      player.percentY = options.y;
+    }
+  }
+
+  function handlePlayerPositioning(playerId, targetX, targetY) {
+    console.log(`Positioning player ${playerId} at ${targetX},${targetY}`);
+    
+    const player = store.players.find(p => p.id === playerId);
+    if (!player) return;
+
+    const positionMarkers = store.currentTactic?.positions || [];
+    const isFreePlacement = positionMarkers.length === 0;
+
+    let canPlace = isFreePlacement;
+    let finalX = targetX;
+    let finalY = targetY;
+
+    if (!isFreePlacement) {
+      const closestMarker = findClosestMarker(targetX, targetY, positionMarkers);
+      if (closestMarker) {
+        finalX = closestMarker.xPercent;
+        finalY = closestMarker.yPercent;
+        canPlace = true;
       }
     }
 
-    players.value.push(player);
-    updateView();
-  }
+    if (canPlace) {
+      const existingPlayer = getPitchPlayers().find(
+        p => Math.abs(p.percentX - finalX) < 0.1 &&
+          Math.abs(p.percentY - finalY) < 0.1 &&
+          p.id !== playerId
+      );
 
-  function movePlayer(playerId, newLocation) {
-    const player = getPlayerById(playerId);
-    if (player) {
-      player.location.value = newLocation;
-      updateView();
+      if (existingPlayer) {
+        console.log('Position swap detected with player:', existingPlayer.id);
+        
+        const oldX = player.percentX;
+        const oldY = player.percentY;
+        const wasOnPitch = player.location === "pitch";
+
+        movePlayer(playerId, { x: finalX, y: finalY, location: "pitch" });
+
+        if (wasOnPitch) {
+          movePlayer(existingPlayer.id, { x: oldX, y: oldY, location: "pitch" });
+        } else {
+          movePlayer(existingPlayer.id, { location: "bench" });
+        }
+      } else {
+        movePlayer(playerId, { x: finalX, y: finalY, location: "pitch" });
+      }
     }
   }
 
-  function updateView() {
-    if (!viewManager.value) return;
+  function findClosestMarker(x, y, markers) {
+    let closest = null;
+    let minDistance = Infinity;
 
-    viewManager.value.clearViews();
-    viewManager.value.updatePlaceholder();
+    markers.forEach(marker => {
+      const dx = marker.xPercent - x;
+      const dy = marker.yPercent - y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
 
-    const appStore = useAppStore();
-    const positionMarkers = appStore.getPositionMarkers();
-    if (positionMarkers.length > 0) {
-      positionMarkers.forEach((marker) => {
-        viewManager.value.createPositionMarker(marker);
-      });
-    }
-
-    players.value.forEach((player) => {
-      if (player.location.value === "bench") {
-        viewManager.value.createBenchPlayer(player);
-      } else if (player.location.value === "pitch") {
-        viewManager.value.createPitchPlayer(player);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closest = marker;
       }
     });
-  }
 
-  function getPlayerById(id) {
-    return players.value.find((p) => p.id.value === id);
+    return minDistance < 10 ? closest : null;
   }
 
   function getBenchPlayers() {
-    return players.value.filter((p) => p.location.value === "bench");
+    return store.players.filter(p => p.location === "bench");
   }
 
   function getPitchPlayers() {
-    return players.value.filter((p) => p.location.value === "pitch");
+    return store.players.filter(p => p.location === "pitch");
+  }
+
+  function redistributePlayers() {
+    console.log('Redistributing players');
+    // Logic for redistributing players if needed
   }
 
   return {
-    players,
-    init,
     addPlayer,
     movePlayer,
-    updateView,
-    getPlayerById,
+    handlePlayerPositioning,
     getBenchPlayers,
     getPitchPlayers,
+    redistributePlayers,
+    setDraggedPlayer,
+    getDraggedPlayer
   };
 }

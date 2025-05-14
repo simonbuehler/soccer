@@ -31,7 +31,7 @@
     <div
       class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 text-xs font-bold text-center text-grey-800"
     >
-      {{ player.displayName.split(",")[1].trim() }}
+      {{ player.displayName }}
     </div>
   </div>
 </template>

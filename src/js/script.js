@@ -157,8 +157,8 @@ export const App = {
     
     // Ensure the corresponding game type button is marked as active
     document.querySelectorAll('.game-type-btn').forEach(btn => {
-      const isActive = btn.dataset.type === `${defaultGameType}er`;
-      btn.classList.toggle('active', isActive);
+   //   const isActive = btn.dataset.type === `${defaultGameType}er`;
+   //   btn.classList.toggle('active', isActive);
     });
     
     // Load tactics for the default game type

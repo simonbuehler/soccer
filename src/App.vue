@@ -1,19 +1,22 @@
 <script setup>
   import { ref, onMounted } from "vue";
   import { useAppStore } from "@/stores/appStore";
+  import { usePlayerPool } from "@/composables/usePlayerPool";
+  import { useTacticManager } from "@/composables/useTacticManager";
   import PitchContainer from "@/components/PitchContainer.vue";
   import BenchContainer from "@/components/BenchContainer.vue";
   import ActionsPanel from "@/components/ActionsPanel.vue";
   import PlayerDialog from "@/components/PlayerDialog.vue";
   import TacticInfoModal from "@/components/TacticInfoModal.vue";
 
+
   const appStore = useAppStore();
+  const tacticManager = useTacticManager();
   const showPlayerDialog = ref(false);
   const showTacticInfo = ref(false);
 
   onMounted(() => {
-    appStore.init();
-    appStore.setGameType(7); // Initialize with default game type
+    tacticManager.initializeGame();
   });
 
   function handlePrint() {
@@ -22,7 +25,7 @@
 </script>
 
 <template>
-  <div class="app-container flex flex-col lg:flex-row gap-8 p-4">
+  <div class="app-container flex flex-col lg:flex-row gap-8 p-4 bg-green-300">
     <!-- Left column with actions and substitutes -->
     <div class="w-full lg:w-72 flex flex-col gap-4 print-order-2">
       <ActionsPanel

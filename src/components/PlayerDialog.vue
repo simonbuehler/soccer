@@ -1,22 +1,9 @@
 <script setup>
-  import { defineEmits, watch } from "vue";
+  import { defineEmits } from "vue";
   import { usePlayerInputHandler } from "@/composables/usePlayerInputHandler";
-  import { useAppStore } from "@/stores/appStore";
 
   const emit = defineEmits(["close"]);
-  const appStore = useAppStore();
   const { playerInput, addPlayers } = usePlayerInputHandler();
-
-  // Verify store initialization
-  watch(
-    () => appStore.playerPool,
-    (newVal) => {
-      if (!newVal) {
-        console.error("PlayerPool not available in store");
-      }
-    },
-    { immediate: true }
-  );
 
   async function handleAddPlayers() {
     try {

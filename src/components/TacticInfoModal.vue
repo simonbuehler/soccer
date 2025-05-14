@@ -41,15 +41,37 @@
           </svg>
         </button>
       </div>
-      <div class="mt-3">
-        <p
-          v-if="currentTactic?.extendedDescription"
-          class="text-sm text-gray-700 leading-relaxed whitespace-pre-line"
-          v-html="currentTactic.extendedDescription.replace(/\n/g, '<br>')"
-        ></p>
-        <p v-else class="text-gray-500 italic">
+      <div class="mt-3 space-y-4">
+        <div>
+          <h4 class="font-semibold text-gray-800">Spieleranzahl:</h4>
+          <p>{{ currentTactic?.playerCount || '7' }}</p>
+        </div>
+
+        <div v-if="currentTactic?.description">
+          <h4 class="font-semibold text-gray-800">Beschreibung:</h4>
+          <p class="text-gray-700">{{ currentTactic.description }}</p>
+        </div>
+
+        <div v-if="currentTactic?.bulletpoints?.length">
+          <h4 class="font-semibold text-gray-800">Merkmale:</h4>
+          <ul class="list-disc pl-5 space-y-1">
+            <li v-for="(point, index) in currentTactic.bulletpoints" :key="index">
+              {{ point }}
+            </li>
+          </ul>
+        </div>
+
+        <div v-if="currentTactic?.extendedDescription">
+          <h4 class="font-semibold text-gray-800">Details:</h4>
+          <p
+            class="text-sm text-gray-700 leading-relaxed whitespace-pre-line"
+            v-html="currentTactic.extendedDescription.replace(/\n/g, '<br>')"
+          ></p>
+        </div>
+
+        <div v-else class="text-gray-500 italic">
           Keine erweiterte Beschreibung verfügbar
-        </p>
+        </div>
       </div>
     </div>
   </div>
