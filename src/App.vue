@@ -1,55 +1,30 @@
 <script setup>
-  import { ref, onMounted } from "vue";
-  import { useAppStore } from "@/stores/appStore";
-  import { usePlayerPool } from "@/composables/usePlayerPool";
-  import { useTacticManager } from "@/composables/useTacticManager";
-  import PitchContainer from "@/components/PitchContainer.vue";
-  import BenchContainer from "@/components/BenchContainer.vue";
-  import ActionsPanel from "@/components/ActionsPanel.vue";
-  import PlayerDialog from "@/components/PlayerDialog.vue";
-  import TacticInfoModal from "@/components/TacticInfoModal.vue";
-
-
-  const appStore = useAppStore();
-  const tacticManager = useTacticManager();
-  const showPlayerDialog = ref(false);
-  const showTacticInfo = ref(false);
-
-  onMounted(() => {
-    tacticManager.initializeGame();
-  });
-
-  function handlePrint() {
-    window.print();
-  }
+// App.vue als einfacher Router-Wrapper
 </script>
 
 <template>
-  <div class="app-container flex flex-col lg:flex-row gap-8 p-4 bg-green-300">
-    <!-- Left column with actions and substitutes -->
-    <div class="w-full lg:w-72 flex flex-col gap-4 print-order-2">
-      <ActionsPanel
-        @openPlayerDialog="showPlayerDialog = true"
-        @print="handlePrint"
-      />
-      <BenchContainer />
-    </div>
-
-    <!-- Football pitch -->
-    <div
-      class="flex-1 flex lg:order-none mb-4 lg:mb-0 print-order-1 print:justify-center"
-    >
-      <PitchContainer />
-    </div>
-
-    <!-- Modals -->
-    <PlayerDialog v-if="showPlayerDialog" @close="showPlayerDialog = false" />
-    <TacticInfoModal v-if="showTacticInfo" @close="showTacticInfo = false" />
+  <div class="app-container">
+    <header class="bg-blue-900 text-white p-4">
+      <nav class="container mx-auto flex justify-between items-center">
+        <h1 class="text-xl font-bold">Fußball App</h1>
+        <div class="space-x-4">
+          <router-link to="/" class="hover:text-gray-300">Home</router-link>
+          <router-link to="/sample" class="hover:text-gray-300">Sample</router-link>
+        </div>
+      </nav>
+    </header>
+    
+    <main>
+      <router-view />
+    </main>
+    
+    <footer class="bg-blue-900 text-white p-4 mt-8">
+      <div class="container mx-auto text-center">
+        <p>&copy; 2023 Fußball Aufstellung App</p>
+      </div>
+    </footer>
   </div>
 </template>
 
 <style>
-  .app-container {
-    min-height: 100vh;
-  }
 </style>
