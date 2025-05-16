@@ -5,6 +5,9 @@
   const tacticManager = useTacticManager();
   const showTacticInfo = ref(false);
 
+  // Event Emits definieren
+  const emit = defineEmits(['open-player-dialog', 'print']);
+
   const gameTypes = [
     { value: 7, label: "7er" },
     { value: 9, label: "9er" },
@@ -21,6 +24,14 @@
 
   function setTactic(tacticName) {
     tacticManager.setTactic(tacticName);
+  }
+
+  function openPlayerDialog() {
+    emit('open-player-dialog');
+  }
+
+  function print() {
+    emit('print');
   }
 </script>
 
@@ -108,13 +119,13 @@
       </div>
 
       <button
-        @click="$emit('openPlayerDialog')"
+        @click="openPlayerDialog"
         class="w-full px-6 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg shadow transition-all duration-200 hover:shadow-md"
       >
         Spieler hinzufügen
       </button>
       <button
-        @click="$emit('print')"
+        @click="print"
         class="w-full px-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg shadow transition-all duration-200 hover:shadow-md"
       >
         Drucken

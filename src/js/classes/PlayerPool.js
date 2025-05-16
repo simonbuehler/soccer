@@ -40,10 +40,17 @@ export class PlayerPool {
     this.updateView();
   }
 
-  movePlayer(playerId, newLocation) {
+  movePlayer(playerId, newLocation, percentX = null, percentY = null) {
     const player = this.getPlayerById(playerId);
     if (player) {
       player.location = newLocation;
+      
+      // Update percentage positions if provided
+      if (percentX !== null && percentY !== null) {
+        player.percentX = percentX;
+        player.percentY = percentY;
+      }
+      
       this.updateView();
     }
   }

@@ -1,5 +1,11 @@
 <script setup>
-// App.vue als einfacher Router-Wrapper
+import { onMounted } from 'vue';
+import { providePlayerService } from './composables/usePlayerService';
+
+// Stelle den PlayerService für die gesamte Anwendung bereit
+providePlayerService();
+
+
 </script>
 
 <template>
@@ -9,8 +15,7 @@
         <h1 class="text-xl font-bold">Fußball App</h1>
         <div class="space-x-4">
           <router-link to="/" class="hover:text-gray-300">Home</router-link>
-          <router-link to="/sample" class="hover:text-gray-300">Sample</router-link>
-        </div>
+         </div>
       </nav>
     </header>
     

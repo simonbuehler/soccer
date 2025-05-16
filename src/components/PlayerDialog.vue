@@ -1,54 +1,204 @@
 <script setup>
-  import { defineEmits } from "vue";
-  import { usePlayerInputHandler } from "@/composables/usePlayerInputHandler";
+import { ref, onMounted, nextTick, watch } from "vue";
+import { usePlayerService } from "@/composables/usePlayerService";
 
-  const emit = defineEmits(["close"]);
-  const { playerInput, addPlayers } = usePlayerInputHandler();
+// Definiere isOpen prop
+const props = defineProps({
+  modelValue: {
+    type: Boolean,
+    default: false,
+  },
+});
 
-  async function handleAddPlayers() {
-    try {
-      if (!playerInput.value.trim()) {
-        console.warn("Empty player input");
-        return;
-      }
+const emit = defineEmits(["update:modelValue", "added"]);
+const playerInput = ref("");
+const inputRef = ref(null);
+const playerService = usePlayerService();
+const errors = ref([]);
 
-      await addPlayers();
-      emit("close");
-
-      // Reset input after successful addition
-      playerInput.value = "";
-    } catch (error) {
-      console.error("Error adding players:", error);
+// Fokus auf das Textarea setzen, wenn der Dialog geöffnet wird
+watch(
+  () => props.modelValue,
+  async (isOpen) => {
+    if (isOpen) {
+      await nextTick();
+      inputRef.value?.focus();
     }
   }
+);
+
+// Handle close
+function closeDialog() {
+  emit("update:modelValue", false);
+}
+
+function parsePlayerInput(line) {
+  let numberStr, firstNameStr, lastNameStr;
+
+  const parts = line.split(",");
+  if (parts.length >= 2) {
+    const numberPartRaw = parts[0].trim();
+    firstNameStr = parts[1].trim();
+
+    const numberAndLastName = numberPartRaw.split(/\s+/);
+    numberStr = numberAndLastName[0].trim();
+    lastNameStr =
+      numberAndLastName.length > 1 ? numberAndLastName.slice(1).join(" ").trim() : "";
+
+    if (parts.length > 2) {
+      lastNameStr = parts.slice(1).join(",").trim().split(/\s+/).slice(1).join(" ");
+      firstNameStr = parts[1].trim().split(/\s+/)[0].trim();
+    }
+  } else {
+    const spaceParts = line.split(/\s+/);
+    if (spaceParts.length >= 2) {
+      numberStr = spaceParts[0].trim();
+      firstNameStr = spaceParts[1].trim();
+      lastNameStr = spaceParts.length > 2 ? spaceParts.slice(2).join(" ").trim() : "";
+    } else {
+      throw new Error(`Ungültiges Spielerformat: "${line}"`);
+    }
+  }
+
+  if (!numberStr || !firstNameStr) {
+    throw new Error(`Fehlende Nummer oder Vorname: "${line}"`);
+  }
+
+  const number = parseInt(numberStr);
+  if (isNaN(number)) {
+    throw new Error(`Ungültige Spielernummer: "${numberStr}"`);
+  }
+
+  return {
+    number,
+    firstName: firstNameStr,
+    lastName: lastNameStr || "",
+    location: "bench",
+    percentX: 0,
+    percentY: 0,
+  };
+}
+
+function addPlayers() {
+  const inputText = playerInput.value.trim();
+  if (!inputText) return;
+
+  errors.value = [];
+  let addedCount = 0;
+
+  inputText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line)
+    .forEach((line) => {
+      try {
+        const playerData = parsePlayerInput(line);
+
+        // Nutze playerService.addPlayer statt playerPool.addPlayer
+        if (playerService.addPlayer(playerData)) {
+          addedCount++;
+        } else {
+          // Spieler existiert bereits
+          errors.value.push(`${line}: Spieler existiert bereits`);
+        }
+      } catch (e) {
+        // Fehler beim Parsen der Eingabe
+        errors.value.push(`${line}: ${e.message}`);
+      }
+    });
+
+  if (addedCount > 0) {
+    playerInput.value = "";
+    emit("added", addedCount);
+
+    // Wenn alle Spieler erfolgreich hinzugefügt wurden (keine Fehler), Dialog schließen
+    if (errors.value.length === 0) {
+      closeDialog();
+    }
+  }
+}
+
+function closeErrorsOnly() {
+  errors.value = [];
+}
 </script>
 
 <template>
-  <div
-    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-  >
-    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
-      <h2 class="text-2xl font-bold text-gray-800 mb-4">Spieler hinzufügen</h2>
-      <textarea
-        v-model="playerInput"
-        class="w-full border border-gray-300 rounded-lg p-3 mb-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        placeholder="Nummer Nachname, Vorname (z.B. 10 Müller, Thomas)"
-        rows="5"
-      ></textarea>
-      <div class="flex justify-end space-x-3">
-        <button
-          @click="emit('close')"
-          class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-lg transition-colors"
+  <Teleport to="body">
+    <div
+      v-if="modelValue"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      role="dialog"
+      aria-labelledby="dialog-title"
+      @keydown.esc="closeDialog"
+    >
+      <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4" @click.stop>
+        <h2 id="dialog-title" class="text-2xl font-bold text-gray-800 mb-4">
+          Spieler hinzufügen
+        </h2>
+
+        <!-- Vereinfachte Fehleranzeige -->
+        <div
+          v-if="errors.length > 0"
+          class="mb-4 p-3 bg-red-50 border border-red-300 rounded-lg"
         >
-          Abbrechen
-        </button>
-        <button
-          @click="handleAddPlayers"
-          class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
-        >
-          Hinzufügen
-        </button>
+          <div class="flex justify-between items-center mb-2">
+            <h3 class="text-red-700 font-medium">Fehler beim Hinzufügen:</h3>
+            <button
+              @click="closeErrorsOnly"
+              class="text-red-500 hover:text-red-700"
+              type="button"
+              aria-label="Fehler ausblenden"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-5 w-5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+            </button>
+          </div>
+          <ul class="text-sm text-red-600 space-y-1 list-disc list-inside">
+            <li v-for="(error, index) in errors" :key="index">{{ error }}</li>
+          </ul>
+        </div>
+
+        <textarea
+          ref="inputRef"
+          v-model="playerInput"
+          class="w-full border border-gray-300 rounded-lg p-3 mb-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder="Nummer Nachname, Vorname (z.B. 10 Müller, Thomas)"
+          rows="5"
+        ></textarea>
+        <div class="flex justify-end space-x-3">
+          <button
+            @click="closeDialog"
+            class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-lg transition-colors"
+          >
+            Abbrechen
+          </button>
+          <button
+            @click="addPlayers"
+            class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
+          >
+            Hinzufügen
+          </button>
+        </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
+
+<style>
+/* Füge ein spezifisches Styling für die Fehleranzeige hinzu */
+.error-notification {
+  z-index: 100;
+  position: relative;
+}
+</style>

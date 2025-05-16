@@ -1,37 +1,29 @@
 <script setup>
-  import { ref, onMounted } from "vue";
-  import { useAppStore } from "@/stores/appStore";
-  import { usePlayerPool } from "@/composables/usePlayerPool";
-  import { useTacticManager } from "@/composables/useTacticManager";
-  import PitchContainer from "@/components/PitchContainer.vue";
-  import BenchContainer from "@/components/BenchContainer.vue";
-  import ActionsPanel from "@/components/ActionsPanel.vue";
-  import PlayerDialog from "@/components/PlayerDialog.vue";
-  import TacticInfoModal from "@/components/TacticInfoModal.vue";
+import { ref, onMounted } from "vue";
+import { useTacticManager } from "@/composables/useTacticManager";
+import PitchContainer from "@/components/PitchContainer.vue";
+import BenchContainer from "@/components/BenchContainer.vue";
+import ActionsPanel from "@/components/ActionsPanel.vue";
+import PlayerDialog from "@/components/PlayerDialog.vue";
+import TacticInfoModal from "@/components/TacticInfoModal.vue";
+const tacticManager = useTacticManager();
+const showPlayerDialog = ref(false);
+const showTacticInfo = ref(false);
 
+onMounted(() => {
+  tacticManager.initializeGame();
+});
 
-  const appStore = useAppStore();
-  const tacticManager = useTacticManager();
-  const showPlayerDialog = ref(false);
-  const showTacticInfo = ref(false);
-
-  onMounted(() => {
-    tacticManager.initializeGame();
-  });
-
-  function handlePrint() {
-    window.print();
-  }
+function handlePrint() {
+  window.print();
+}
 </script>
 
 <template>
   <div class="flex flex-col lg:flex-row gap-8 p-4">
     <!-- Left column with actions and substitutes -->
     <div class="w-full lg:w-72 flex flex-col gap-4 print-order-2">
-      <ActionsPanel
-        @openPlayerDialog="showPlayerDialog = true"
-        @print="handlePrint"
-      />
+      <ActionsPanel @open-player-dialog="showPlayerDialog = true" @print="handlePrint" />
       <BenchContainer />
     </div>
 
@@ -42,8 +34,11 @@
       <PitchContainer />
     </div>
 
-    <!-- Modals -->
-    <PlayerDialog v-if="showPlayerDialog" @close="showPlayerDialog = false" />
+    <!-- Modals mit v-model -->
+    <PlayerDialog
+      v-model="showPlayerDialog"
+      @added="(count) => console.log(`${count} Spieler hinzugefügt`)"
+    />
     <TacticInfoModal v-if="showTacticInfo" @close="showTacticInfo = false" />
   </div>
 </template>

@@ -6,8 +6,7 @@ export const useAppStore = defineStore("app", () => {
   const players = ref([]);
   const currentTactic = ref(null);
   const gameType = ref(7); // Numeric value
-  // availableTactics removed - managed by TacticManager
-
+  
   return {
     players,
     currentTactic,
