@@ -1,6 +1,7 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, nextTick, watch } from "vue";
 import { usePlayerService } from "@/composables/usePlayerService";
+import { PlayerData } from "@/core/models/Player";
 
 // Definiere isOpen prop
 const props = defineProps({
@@ -32,13 +33,14 @@ function closeDialog() {
   emit("update:modelValue", false);
 }
 
-function parsePlayerInput(line) {
+function parsePlayerInput(line: string): PlayerData {
   let numberStr, firstNameStr, lastNameStr;
 
   const parts = line.split(",");
   if (parts.length >= 2) {
     const numberPartRaw = parts[0].trim();
-    firstNameStr = parts[1].trim();
+    // Extrahiere nur den ersten Vornamen, falls mehrere angegeben sind
+    firstNameStr = parts[1].trim().split(/\s+/)[0].trim();
 
     const numberAndLastName = numberPartRaw.split(/\s+/);
     numberStr = numberAndLastName[0].trim();
@@ -47,12 +49,14 @@ function parsePlayerInput(line) {
 
     if (parts.length > 2) {
       lastNameStr = parts.slice(1).join(",").trim().split(/\s+/).slice(1).join(" ");
+      // Bei komplexeren Eingaben ebenfalls nur den ersten Vornamen nehmen
       firstNameStr = parts[1].trim().split(/\s+/)[0].trim();
     }
   } else {
     const spaceParts = line.split(/\s+/);
     if (spaceParts.length >= 2) {
       numberStr = spaceParts[0].trim();
+      // Nur den ersten Vornamen nehmen
       firstNameStr = spaceParts[1].trim();
       lastNameStr = spaceParts.length > 2 ? spaceParts.slice(2).join(" ").trim() : "";
     } else {
@@ -103,7 +107,7 @@ function addPlayers() {
         }
       } catch (e) {
         // Fehler beim Parsen der Eingabe
-        errors.value.push(`${line}: ${e.message}`);
+        errors.value.push(`${line}: ${(e as Error).message}`);
       }
     });
 

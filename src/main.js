@@ -1,26 +1,17 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
-import { createRouter, createWebHistory } from "vue-router";
 import App from "./App.vue";
+import router from "./router";
 
-// Router-Konfiguration (anpassen nach deinen Routen)
-const routes = [
-  {
-    path: '/',
-    name: 'Home',
-    component: () => import('./views/Home.vue')
-  }
-];
-
-const router = createRouter({
-  history: createWebHistory(),
-  routes
-});
-
+// App erstellen
 const app = createApp(App);
-const pinia = createPinia();
 
+// Pinia vor allen anderen Plugins initialisieren
+const pinia = createPinia();
 app.use(pinia);
+
+// Router hinzufügen
 app.use(router);
 
-app.mount("#vue-app");
+// App mounten
+app.mount("#app");

@@ -1,11 +1,8 @@
 <script setup>
-import { onMounted } from 'vue';
 import { providePlayerService } from './composables/usePlayerService';
 
-// Stelle den PlayerService für die gesamte Anwendung bereit
+// Service bereitstellen, Rückgabewert wird nicht benötigt
 providePlayerService();
-
-
 </script>
 
 <template>

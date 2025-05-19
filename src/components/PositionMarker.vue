@@ -18,19 +18,20 @@ const props = defineProps({
   }
 });
 
-const borderColor = computed(() =>
-  props.isRequired ? 'border-blue-600' : 'border-blue-400'
-);
+// Vollständige Tailwind-Klassen basierend auf isRequired
+const markerClasses = computed(() => {
+  const baseClasses = "position-marker absolute w-16 h-16 rounded-full border-2 border-dashed pointer-events-none -translate-x-1/2 -translate-y-1/2 transition-all duration-200 ease-in-out";
+  const colorClass = props.isRequired ? "border-blue-600" : "border-blue-400";
+  return `${baseClasses} ${colorClass}`;
+});
 </script>
 
 <template>
   <div
-    class="position-marker absolute w-16 h-16 rounded-full border-2 border-dashed pointer-events-none transition-all duration-200"
-    :class="borderColor"
+    :class="markerClasses"
     :style="{
       left: `${marker.xPercent}%`,
       top: `${marker.yPercent}%`,
-      transform: 'translate(-50%, -50%)'
     }"
     :data-x="marker.xPercent"
     :data-y="marker.yPercent"

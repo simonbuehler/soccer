@@ -1,120 +1,84 @@
-<script setup>
-import { computed, ref, watch } from "vue";
-import { useDragAndDrop } from "@formkit/drag-and-drop/vue";
-import { usePlayerService } from "@/composables/usePlayerService";
+<script setup lang="ts">
+import { computed, ref } from "vue";
+import { dragAndDrop } from "@formkit/drag-and-drop/vue";
 import { dropOrSwap } from "@formkit/drag-and-drop";
+import { useAppStore } from "@/stores/appStore";
+import { storeToRefs } from "pinia";
+import { Player } from "@/core/models/Player";
 
-// PlayerService importieren
-const playerService = usePlayerService();
+const { benchPlayers } = storeToRefs(useAppStore());
 
-// Direkter Zugriff auf die Bankspieler über den PlayerService
-const benchPlayers = computed(() => playerService.getBenchPlayers());
-const hasPlayers = computed(() => benchPlayers.value.length > 0);
-const showPlaceholder = computed(() => !hasPlayers.value);
 
-// Erstelle eine lokale, reaktive Kopie für FormKit als ARRAY
-const formkitPlayers = ref([]);
+// NEU: Prüfen, ob es Spieler im Spiel gibt, aber alle auf dem Feld sind
+const appStore = useAppStore();
+const hasPlayersOnBench = computed(() => benchPlayers.value.length > 0);
+const hasPlayersOnField = computed(() => appStore.fieldPlayers.length > 0);
 
-// Aktualisiere die lokale Kopie, wenn sich die Original-Spieler ändern
-watch(
-  benchPlayers,
-  (newPlayers) => {
-    // Stellen Sie sicher, dass newPlayers ein Array ist
-    if (Array.isArray(newPlayers)) {
-      formkitPlayers.value = [...newPlayers];
-    } else {
-      console.error("[ERROR-BENCH] benchPlayers is not an array:", newPlayers);
-      formkitPlayers.value = [];
-    }
-  },
-  { immediate: true }
+// Zustände:
+// 1. Keine Spieler im Spiel (weder auf der Bank noch auf dem Feld)
+const showEmptyGamePlaceholder = computed(() => !hasPlayersOnBench.value && !hasPlayersOnField.value);
+
+// 2. Spieler existieren, aber alle sind auf dem Feld 
+const showAllOnFieldPlaceholder = computed(() =>
+  !hasPlayersOnBench.value && hasPlayersOnField.value
 );
 
-// FormKit Drag & Drop mit der lokalen, reaktiven Kopie
-const [benchRef, players] = useDragAndDrop(formkitPlayers, {
-  group: "players",
+const benchRef = ref(null);
+dragAndDrop<Player>({
+  parent: benchRef,
+  values: benchPlayers,
   plugins: [dropOrSwap()],
-
-  handleParentDrop(data, state) {
-    // Wir brauchen die ID aus dem currentTargetValue
-    const playerId = state.currentTargetValue?.id;
-
-    console.log("[DEBUG-BENCH] Player ID from currentTargetValue:", playerId);
-
-    if (!playerId) {
-      console.error("[ERROR-BENCH] Missing player ID");
-      return;
-    }
-
-    // Finde den entsprechenden Player, da wir jetzt ein Player-Objekt übergeben müssen
-    const player = playerService.findPlayer(playerId);
-
-    if (!player) {
-      console.error("[ERROR-BENCH] Player not found with ID:", playerId);
-      return;
-    }
-
-    console.log("[DEBUG-BENCH] Moving player to bench:", player);
-
-    // Übergebe das Player-Objekt an playerService
-    const result = playerService.movePlayer(player, { location: "bench" });
-
-    if (result.success) {
-      console.log("[DEBUG-BENCH] Player successfully moved to bench");
-    } else {
-      console.error("[ERROR-BENCH] Failed to move player to bench:", result.error);
-    }
+  group: "players",
+  draggable: (el) => {
+    return el.classList.contains("player");
   },
+  handleParentDragover: (data, state) => {
+    // Hier können wir den Drag-Vorgang behandeln, wenn nötig
+    console.log("[DEBUG-BENCH] handleParentDragover", data, state);
+    
+  },
+  onDragend: (event) => {
+    console.log("[DEBUG-BENCH] onDragend ", event.draggedNode.data.value.id);
+  }
+
 });
 </script>
 
 <template>
   <div
-    class="bg-white rounded-xl shadow-lg p-4 hover:bg-gray-50 transition-colors duration-200 print:shadow-none print:w-4/5 print:mx-auto print:mt-1 print:p-2"
-  >
+    class="bg-white rounded-xl shadow-lg p-4 hover:bg-gray-50 transition-colors duration-200 print:shadow-none print:w-4/5 print:mx-auto print:mt-1 print:p-2">
     <h2 class="text-xl font-bold text-gray-800 border-b pb-2 print:text-lg print:pb-1">
       Ersatzbank
     </h2>
-    <div
-      ref="benchRef"
-      class="mt-4 flex flex-wrap gap-2 w-full print:mt-1 print:gap-1 print:justify-start"
-      :class="{
-        'border-2 border-dashed border-blue-600 rounded-lg p-2 bg-blue-50 min-h-20': hasPlayers,
-      }"
-    >
+    <!-- Immer eine Mindesthöhe anwenden, auch wenn keine Spieler vorhanden sind -->
+    <div ref="benchRef"
+      class="mt-4 flex flex-wrap gap-3 w-full print:mt-1 print:gap-1 print:justify-start min-h-20 border-2 border-dashed border-blue-600 rounded-lg p-3 bg-blue-50">
       <!-- WICHTIG: Jedes Element mit draggable muss auch data-id haben -->
-      <div
-        v-for="player in players"
-        :key="player.id"
-        :data-id="player.id"
-        class="player bg-blue-600 text-white mb-2 px-3 py-2 rounded-lg cursor-move"
-      >
-        <div class="flex items-center gap-2">
-          <div
-            class="w-8 h-8 rounded-full bg-blue-800 flex items-center justify-center font-bold"
-          >
-            {{ player.number || "?" }}
+      <div v-for="player in benchPlayers" :key="player.id"
+        class="player bg-gradient-to-br from-blue-500 to-blue-700 text-white px-3 py-2 rounded-lg cursor-move 
+               transition-all duration-200 hover:-translate-y-1 hover:shadow-lg shadow-md min-w-32">
+        <div class="flex items-center gap-3 relative">
+          <!-- Hintergrundnummer entfernt, da sie redundant ist -->
+          
+          <!-- Spielernummer im Kreis -->
+          <div class="w-10 h-10 rounded-full bg-blue-800 flex items-center justify-center font-bold text-lg border border-blue-300 shadow-inner">
+            {{ player.number || "#" }}
           </div>
-          <span>{{ player.displayName }}</span>
+          
+          <!-- Spielername -->
+          <span class="font-bold truncate">
+            {{ player.displayName }}
+          </span>
         </div>
       </div>
+
+      <!-- Unterschiedliche Platzhalter-Nachrichten je nach Zustand -->
+      <p v-if="showEmptyGamePlaceholder" class="text-gray-500 text-sm text-center w-full mt-2 px-4 print:hidden">
+        Hier ist es leer - Spieler hinzufügen über den Button
+      </p>
+      <p v-else-if="showAllOnFieldPlaceholder" class="text-gray-500 text-sm text-center w-full mt-2 px-4 print:hidden">
+        Alle Spieler sind auf dem Feld - hierher ziehen für Auswechslung
+      </p>
     </div>
-    <p
-      v-if="showPlaceholder"
-      class="text-gray-500 text-sm text-center mt-4 lg:mt-8 px-4 print:hidden"
-    >
-      Hier ist es leer - Spieler hinzufügen über den Button
-    </p>
   </div>
 </template>
-
-<style scoped>
-.player {
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.player:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
-</style>

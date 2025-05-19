@@ -1,17 +1,24 @@
-<script setup>
-import { ref, onMounted, onUnmounted, computed, watch } from "vue";
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import PositionMarker from "./PositionMarker.vue";
 import { useTacticManager } from "@/composables/useTacticManager";
 import { usePlayerService } from "@/composables/usePlayerService";
+import { useAppStore } from "@/stores/appStore";
+import { storeToRefs } from "pinia";
+import { Player } from "@/core/models/Player";
 
-import { useDragAndDrop } from "@formkit/drag-and-drop/vue";
-import { dropOrSwap } from "@formkit/drag-and-drop";
+import { dragAndDrop } from "@formkit/drag-and-drop/vue";
+import {
+  dropOrSwap,
+  handleParentDragover,
+  performTransfer,
+} from "@formkit/drag-and-drop";
 
 const tacticManager = useTacticManager();
 
 const playerService = usePlayerService();
 const playersContainerRef = ref(null);
-
+const pitchRef = ref(null);
 const svgDimensions = ref({
   width: 0,
   height: 0,
@@ -47,8 +54,8 @@ function handleResize() {
   updateSvgDimensions();
 }
 
-// Übernommen aus useViewManager - Hervorhebt den nächsten Positionsmarker
-function highlightClosestMarker(x, y) {
+// Überarbeitete Funktion mit Tailwind-Klassen für die Origin
+function highlightClosestMarker(xPercent, yPercent) {
   if (!playersContainerRef.value) return null;
 
   const markers = Array.from(
@@ -56,12 +63,19 @@ function highlightClosestMarker(x, y) {
   );
   let closestMarker = null;
   let minDistance = Infinity;
-  const HIGHLIGHT_THRESHOLD = 15;
+  
+  // Prozentuale Distanz auf 10% erhöht
+  const HIGHLIGHT_THRESHOLD = 10; // 10% des Spielfelds
 
   markers.forEach((marker) => {
+    // Marker-Position aus den Data-Attributen lesen
     const markerX = parseFloat(marker.dataset.x);
     const markerY = parseFloat(marker.dataset.y);
-    const distance = Math.sqrt(Math.pow(x - markerX, 2) + Math.pow(y - markerY, 2));
+
+    // Distanzberechnung (jetzt korrekt, da die Marker bereits um 50% verschoben sind)
+    const distance = Math.sqrt(
+      Math.pow(xPercent - markerX, 2) + Math.pow(yPercent - markerY, 2)
+    );
 
     if (distance < minDistance) {
       minDistance = distance;
@@ -69,12 +83,29 @@ function highlightClosestMarker(x, y) {
     }
   });
 
+  // Entferne alle Hervorhebungen mit Tailwind-Klassen
   markers.forEach((marker) => {
-    marker.classList.remove("border-4", "bg-blue-100/30", "animate-pulse-scale");
+    marker.classList.remove(
+      "animate-pulse-fast",
+      "border-4",
+      "shadow-lg", 
+      "shadow-blue-500/50",
+      "scale-[120%]",
+      "z-10"
+    );
   });
 
   if (closestMarker && minDistance < HIGHLIGHT_THRESHOLD) {
-    closestMarker.classList.add("border-4", "bg-blue-100/30", "animate-pulse-scale");
+    // Kombiniere Animation mit origin-center für korrekte Zentrumsskalierung
+    closestMarker.classList.add(
+      "animate-pulse-fast",
+      "scale-[120%]", 
+      "border-4",
+      "shadow-lg",
+      "shadow-blue-500/50",
+      "z-10"
+    );
+    
     return {
       x: parseFloat(closestMarker.dataset.x),
       y: parseFloat(closestMarker.dataset.y),
@@ -84,197 +115,223 @@ function highlightClosestMarker(x, y) {
   return null;
 }
 
-// Übernommen aus useViewManager - Prüft, ob ein Punkt innerhalb des Spielfelds liegt
-function isPointInPitch(x, y) {
-  const svgObject = pitchRef.value?.querySelector("object");
-  if (!svgObject) return false;
-
-  const svgDoc = svgObject.contentDocument;
-  if (!svgDoc) return false;
-
-  const svgElement = svgDoc.documentElement;
-  const svgWidth = svgElement.width.baseVal.value;
-  const svgHeight = svgElement.height.baseVal.value;
-
-  const pitchRect = pitchRef.value.getBoundingClientRect();
-  const svgX = (pitchRect.width - svgWidth) / 2;
-  const svgY = (pitchRect.height - svgHeight) / 2;
-
-  const svgRelativeX = x - svgX;
-  const svgRelativeY = y - svgY;
-
-  return (
-    svgRelativeX >= 10 &&
-    svgRelativeX <= svgWidth - 10 &&
-    svgRelativeY >= 10 &&
-    svgRelativeY <= svgHeight - 10
-  );
+// Stattdessen prüfen wir einfach, ob der Prozentsatz im erlaubten Bereich liegt
+function isInBounds(xPercent, yPercent) {
+  // Ein kleiner Rand von 2% auf allen Seiten
+  return xPercent >= 2 && xPercent <= 98 && yPercent >= 2 && yPercent <= 98;
 }
 
-// Direkter Zugriff auf die Spieler über den PlayerService
-const pitchPlayers = computed(() => playerService.getPitchPlayers());
+const { fieldPlayers } = storeToRefs(useAppStore());
 
-// Erstelle eine lokale, reaktive Kopie für FormKit als ARRAY
-const formkitPlayers = ref([]);
+handleParentDragover = (data, state) => {
+  // Client-Koordinaten des Drag-Events
+  const clientX = data.e.clientX;
+  const clientY = data.e.clientY;
 
-// Aktualisiere die lokale Kopie, wenn sich die Original-Spieler ändern
-watch(
-  pitchPlayers,
-  (newPlayers) => {
-    // Stellen Sie sicher, dass newPlayers ein Array ist
-    if (Array.isArray(newPlayers)) {
-      formkitPlayers.value = [...newPlayers];
-    } else {
-      console.error("pitchPlayers is not an array:", newPlayers);
-      formkitPlayers.value = [];
-    }
-  },
-  { immediate: true }
-);
+  // Nur fortfahren, wenn ein Element gezogen wird
+  if (!state.draggedNode) return;
 
-// FormKit Drag & Drop setup mit der lokalen Kopie
-const [pitchRef, players] = useDragAndDrop(formkitPlayers, {
-  group: "players",
+  // Container-Position abrufen für relative Berechnung
+  const containerRect = playersContainerRef.value.getBoundingClientRect();
+
+  // Berechne prozentuale Position im Container
+  const xPercent = Number(
+    (((clientX - containerRect.left) / containerRect.width) * 100).toFixed(2)
+  );
+  const yPercent = Number(
+    (((clientY - containerRect.top) / containerRect.height) * 100).toFixed(2)
+  );
+
+  // Nur wenn die Position innerhalb des Containers liegt
+  if (isInBounds(xPercent, yPercent)) {
+    highlightClosestMarker(xPercent, yPercent);
+  }
+};
+
+dragAndDrop<Player>({
+  parent: playersContainerRef,
+  values: fieldPlayers,
   plugins: [dropOrSwap()],
+  group: "players",
   draggable: (el) => {
     return el.classList.contains("player-token");
   },
 
-  handleParentDrop(data, state) {
-    // Konsistente ID-Ermittlung über currentTargetValue wie im Debug-Log sichtbar
-    const playerId = state.currentTargetValue?.id;
+  handleParentDragover: (data, state) => {
+    // Client-Koordinaten des Drag-Events
+    const clientX = data.e.clientX;
+    const clientY = data.e.clientY;
 
-    console.log("[DEBUG-PITCH] Player ID from currentTargetValue:", playerId);
+    // Nur fortfahren, wenn ein Element gezogen wird
+    if (!state.draggedNode) return;
+
+
+
+    // Container-Position abrufen für relative Berechnung
+    const containerRect = playersContainerRef.value.getBoundingClientRect();
+
+    // Berechne prozentuale Position im Container
+    const xPercent = Number(
+      (((clientX - containerRect.left) / containerRect.width) * 100).toFixed(2)
+    );
+    const yPercent = Number(
+      (((clientY - containerRect.top) / containerRect.height) * 100).toFixed(2)
+    );
+
+    // Nur wenn die Position innerhalb des Containers liegt
+    if (xPercent >= 0 && xPercent <= 100 && yPercent >= 0 && yPercent <= 100) {
+      // Highlight-Marker-Logik verwenden, um den nächsten Marker aufleuchten zu lassen
+      highlightClosestMarker(xPercent, yPercent);
+      
+    
+    }
+  },
+
+  handleParentDrop: (data, state) => {
+    console.log("[DEBUG-PITCH] handleParentDrop", state.draggedNode.data.value.id);
+    // Wir verwenden den bewährten Ansatz von BenchContainer für die ID-Ermittlung
+    const playerId = state.draggedNode.data.value.id;
 
     if (!playerId) {
       console.error("[ERROR-PITCH] Could not determine player ID for positioning");
       return;
     }
 
-    // Berechne prozentuale Position
-    const rect = pitchRef.value.getBoundingClientRect();
-    const dropX = data.e.clientX - rect.left;
-    const dropY = data.e.clientY - rect.top;
+    // Den Container der Spieler als Referenz für die Positionsberechnung verwenden
+    // Dies ist das gleiche Element, in dem die Spieler-Tokens positioniert werden
+    const containerRect = playersContainerRef.value.getBoundingClientRect();
 
-    const xPercent = Number(((dropX / rect.width) * 100).toFixed(2));
-    const yPercent = Number(((dropY / rect.height) * 100).toFixed(2));
+    // Client-Koordinaten des Drop-Events
+    const clientX = data.e.clientX;
+    const clientY = data.e.clientY;
 
-    // Überprüfe, ob der Punkt im Spielfeld liegt
-    if (!isPointInPitch(dropX, dropY)) {
-      console.warn("[WARNING-PITCH] Drop outside of pitch area");
-      return;
-    }
+    // Berechne direkt die prozentuale Position bezogen auf den playersContainer
+    // Da die Spieler mit percentX und percentY relativ zu diesem Container positioniert werden,
+    // ist die Berechnung nun direkter und genauer
+    const xPercent = Number(
+      (((clientX - containerRect.left) / containerRect.width) * 100).toFixed(2)
+    );
+    const yPercent = Number(
+      (((clientY - containerRect.top) / containerRect.height) * 100).toFixed(2)
+    );
 
-    // Versuche zuerst, den Spieler in formkitPlayers zu finden
-    let droppedPlayer = formkitPlayers.value.find((p) => p.id === playerId);
+    // Debug-Informationen
+    console.log({
+      container: {
+        left: containerRect.left,
+        top: containerRect.top,
+        width: containerRect.width,
+        height: containerRect.height,
+      },
+      event: { x: clientX, y: clientY },
+      percent: { x: xPercent, y: yPercent },
+    });
 
-    // Wenn nicht gefunden, überprüfe, ob es ein von der Bank gezogener Spieler ist
-    if (!droppedPlayer) {
-      console.log(
-        "[DEBUG-PITCH] Player not found in formkitPlayers, checking in benchPlayers"
-      );
-
-      // Versuche, den Spieler direkt über den PlayerService zu finden
-      droppedPlayer = playerService.findPlayer(playerId);
-
-      if (droppedPlayer) {
-        console.log("[DEBUG-PITCH] Player found via playerService:", droppedPlayer);
-
-        // Füge den Spieler zur lokalen FormKit-Liste hinzu, damit er in der UI erscheint
-        formkitPlayers.value.push(droppedPlayer);
-      } else {
-        console.error("[ERROR-PITCH] Player not found anywhere:", playerId);
-        return;
-      }
-    }
-
-    console.log("[DEBUG-PITCH] Found dropped player:", droppedPlayer);
-
-    // Optional: Highlight-Marker-Logik verwenden
-    const closestMarker = highlightClosestMarker(xPercent, yPercent);
-    console.log("[DEBUG-PITCH] Closest marker result:", closestMarker);
-
-    let positioningResult;
-    
-    if (closestMarker && closestMarker.shouldSnap) {
-      // Snap zur Position des Markers
-      console.log("[DEBUG-PITCH] Snapping player to marker position:", {
-        x: closestMarker.x,
-        y: closestMarker.y,
-      });
-      
-      // Update im PlayerService
-      positioningResult = playerService.handlePlayerPositioning(
-        droppedPlayer,
-        closestMarker.x,
-        closestMarker.y
-      );
-    } else {
-      // Aktualisiere die prozentuale Position direkt
-      console.log("[DEBUG-PITCH] Setting player to calculated position:", {
+    // Einfache Prüfung, ob der Punkt im Container liegt
+    if (xPercent < 0 || xPercent > 100 || yPercent < 0 || yPercent > 100) {
+      console.warn("[WARNING-PITCH] Drop outside of container boundaries", {
         x: xPercent,
         y: yPercent,
       });
-      
-      // Update im PlayerService
+      return;
+    }
+
+    // Optional: Highlight-Marker-Logik verwenden
+    const closestMarker = highlightClosestMarker(xPercent, yPercent);
+
+    let positioningResult;
+
+    if (closestMarker && closestMarker.shouldSnap) {
+      // Snap zur Position des Markers
       positioningResult = playerService.handlePlayerPositioning(
-        droppedPlayer,
+        playerId,
+        closestMarker.x,
+        closestMarker.y
+      );
+      
+      // NEU: Animation beenden, nachdem der Spieler an die Position "gesnapped" wurde
+      // Entferne alle Hervorhebungen mit Tailwind-Klassen
+      const markers = Array.from(
+        playersContainerRef.value.querySelectorAll(".position-marker")
+      );
+      markers.forEach((marker) => {
+        marker.classList.remove(
+          "animate-pulse-fast",
+          "border-4",
+          "shadow-lg", 
+          "shadow-blue-500/50",
+          "scale-[120%]",
+          "z-10"
+        );
+      });
+    } else {
+      // Aktualisiere die prozentuale Position direkt
+      positioningResult = playerService.handlePlayerPositioning(
+        playerId,
         xPercent,
         yPercent
       );
     }
-    
-    if (positioningResult && positioningResult.success) {
-      console.log("[DEBUG-PITCH] Positioning successful:", positioningResult);
-      
-      if (positioningResult.swapped) {
-        console.log("[DEBUG-PITCH] Player swap performed with:", positioningResult.swapped);
-      }
-    } else {
+
+    if (!positioningResult?.success) {
       console.error("[ERROR-PITCH] Positioning failed:", positioningResult?.error);
     }
   },
 });
-
 </script>
 
 <template>
-  <div class="relative" ref="pitchRef">
+  <div class="relative">
+    <!-- SVG Objekt mit dem Spielfeld -->
     <object
       style="pointer-events: none"
       :data="'/src/assets/pitch.svg'"
       type="image/svg+xml"
       class="block w-full lg:w-auto h-auto print:h-[850px] aspect-[2/3] lg:max-h-[calc(100vh-6rem)]"
+      ref="pitchRef"
     ></object>
+
+    <!-- Spieler-Container genau über dem SVG - mit identischen Dimensionen -->
     <div
-      class="absolute w-full print:w-full lg:w-auto aspect-[2/3] lg:max-h-[calc(100vh-6rem)] inset-0 print:h-[850px]"
+      class="absolute w-full aspect-[2/3] inset-0 print:h-[850px]"
       ref="playersContainerRef"
     >
+      <!-- Position Markers -->
       <PositionMarker
-        v-for="(marker, index) in positionMarkers"
-        :key="`marker-${index}`"
+        v-for="(marker, index) in positionMarkers" 
+        :key="`marker-${index}`" 
         :marker="marker"
         :is-required="!tacticManager.getCurrentTactic()?.name.includes('Frei')"
       />
-      <!-- WICHTIG: Jedes Element mit draggable muss auch data-id haben -->
+      
+      <!-- Spieler Tokens - Verbesserte Darstellung mit Tailwind -->
       <div
-        v-for="player in players"
+        v-for="player in fieldPlayers"
         :key="player.id"
         :data-id="player.id"
-        class="player-token absolute flex flex-col items-center justify-center cursor-move"
+        class="player-token absolute flex flex-col items-center justify-center cursor-move transition-all duration-200 "
         :style="{
           left: `${player.percentX}%`,
           top: `${player.percentY}%`,
-          transform: 'translate(-50%, -50%)',
+          transform: `translate(-50%, -50%)`,
+
         }"
       >
+        <!-- Spieler-Kreis mit Namen und Nummer im Kreis -->
         <div
-          class="w-14 h-14 rounded-full bg-blue-500 text-white flex items-center justify-center shadow"
+          class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-white flex items-center justify-center shadow-lg border-2 border-white relative hover:shadow-xl hover:scale-110 transition-all duration-200 overflow-hidden"
         >
-          {{ player.number || player.firstName[0] }}
-        </div>
-        <div class="player-name text-xs mt-1 bg-white px-1 rounded">
-          {{ player.displayName }}
+          <!-- Große Nummer im Hintergrund des Kreises -->
+          <div
+            class="absolute inset-0 flex items-center justify-center opacity-30 font-extrabold text-5xl text-white select-none z-0"
+          >
+            {{ player.number || "#" }}
+          </div>
+
+          <!-- Spielername im Vordergrund -->
+          <span class="text-sm font-bold tracking-tight z-10 relative">
+            {{ player.displayName || player.firstName }}
+          </span>
         </div>
       </div>
     </div>
@@ -282,25 +339,26 @@ const [pitchRef, players] = useDragAndDrop(formkitPlayers, {
 </template>
 
 <style scoped>
-.player-token {
-  z-index: 10;
-}
-
-@keyframes pulse-scale {
-  0% {
-    transform: scale(1);
+/* Optimierte Animation für korrekte Zentrumsskalierung */
+@keyframes pulse-fast {
+  0% { 
+    opacity: 0.4;
+    transform: translate(-50%, -50%) scale(1); /* Behalte die ursprüngliche Position */
   }
-
-  50% {
-    transform: scale(1.05);
+  50% { 
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2); /* Skaliere vom Zentrum aus */
   }
-
-  100% {
-    transform: scale(1);
+  100% { 
+    opacity: 0.4;
+    transform: translate(-50%, -50%) scale(1); /* Zurück zur Originalposition */
   }
 }
 
-.animate-pulse-scale {
-  animation: pulse-scale 1s infinite ease-in-out;
+.animate-pulse-fast {
+  animation: pulse-fast 0.7s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  transform-origin: center; /* Stellt sicher, dass die Skalierung vom Zentrum aus erfolgt */
 }
+
+/* ...existing styles... */
 </style>
