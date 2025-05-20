@@ -6,20 +6,16 @@
   import { storeToRefs } from "pinia";
   import { Player } from "@/core/models/Player";
 
-  const { benchPlayers } = storeToRefs(useAppStore());
+  const { benchPlayers, fieldPlayers } = storeToRefs(useAppStore());
 
-  // NEU: Prüfen, ob es Spieler im Spiel gibt, aber alle auf dem Feld sind
-  const appStore = useAppStore();
   const hasPlayersOnBench = computed(() => benchPlayers.value.length > 0);
-  const hasPlayersOnField = computed(() => appStore.fieldPlayers.length > 0);
+  const hasPlayersOnField = computed(() => fieldPlayers.value.length > 0);
 
-  // Zustände:
-  // 1. Keine Spieler im Spiel (weder auf der Bank noch auf dem Feld)
+
   const showEmptyGamePlaceholder = computed(
     () => !hasPlayersOnBench.value && !hasPlayersOnField.value
   );
 
-  // 2. Spieler existieren, aber alle sind auf dem Feld
   const showAllOnFieldPlaceholder = computed(
     () => !hasPlayersOnBench.value && hasPlayersOnField.value
   );

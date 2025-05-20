@@ -5,13 +5,8 @@ import router from "./router";
 
 // App erstellen
 const app = createApp(App);
-
-// Pinia vor allen anderen Plugins initialisieren
+app.use(router);
 const pinia = createPinia();
 app.use(pinia);
-
-// Router hinzufügen
-app.use(router);
-
 // App mounten
 app.mount("#app");

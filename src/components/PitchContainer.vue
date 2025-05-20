@@ -64,13 +64,14 @@
   const highlightedMarkerIndex = ref(-1);
 
   /**
-   * Determines whether position markers should be displayed
-   * Checks if there is a tactic selected and if it has positions defined
-   * This is cleaner than checking the tactic name in multiple places
+   * Determines whether position markers should be displayed and if tactic constraints should be applied
+   * Checks if there is a tactic selected that is not "Frei"
    */
   const shouldShowMarkers = computed(() => {
     const currentTactic = tacticManager.getCurrentTactic();
-    return currentTactic?.positions && currentTactic.positions.length > 0;
+    return currentTactic?.positions && 
+           currentTactic.positions.length > 0 && 
+           !currentTactic.name.includes("Frei");
   });
 
   /**
@@ -188,6 +189,7 @@
    * @returns Object with marker position data if found and within threshold
    */
   function highlightClosestMarker(xPercent: number, yPercent: number) {
+
     // Exit early if there are no markers to show or dimensions are not initialized
     if (!shouldShowMarkers.value || !containerDimensions.value.width) {
       return null;
@@ -270,15 +272,10 @@
       dropOrSwap({
         // Handle dragging over the pitch to highlight potential positions
         handleParentDragover: (data, state) => {
-          // Skip debug logging to improve performance
-          // console.log("[DEBUG-PITCH] handleParentDragover");
 
           // Mouse coordinates
           const clientX = data.e.clientX;
           const clientY = data.e.clientY;
-
-          // Skip if no element is being dragged or dimensions aren't initialized
-          if (!state.draggedNode || !containerDimensions.value.width) return;
 
           // Use cached container dimensions instead of triggering reflow
           // WICHTIG: Für die korrekte Berechnung bei Scrolling müssen wir die aktuellen Viewport-Koordinaten
@@ -296,6 +293,7 @@
           const yPercent = Number(
             (((clientY - viewportTop) / height) * 100).toFixed(2)
           );
+
 
           // Only highlight markers if within container bounds AND we have position markers to show
           if (
@@ -323,199 +321,85 @@
 
     // Handle dropping a player on the pitch
     handleParentDrop: (data, state) => {
-      console.log(
-        "[DEBUG-PITCH] handleParentDrop",
-        state.draggedNode.data.value.id
-      );
+      console.log("[DEBUG-PITCH] handleParentDrop", state.draggedNode.data.value.id);
 
       // Get player ID from dragged element
       const playerId = state.draggedNode.data.value.id;
-
       if (!playerId) {
-        console.error(
-          "[ERROR-PITCH] Could not determine player ID for positioning"
-        );
+        console.error("[ERROR-PITCH] Could not determine player ID for positioning");
         return;
       }
 
-      // Make sure dimensions are valid by forcing a fresh measurement
-      // getBoundingClientRect returns positions relative to viewport, not document
+      // Drop event coordinates und Container-Dimensionen berechnen
+      const { clientX, clientY } = data.e;
       const containerRect = playersContainerRef.value.getBoundingClientRect();
+      const { left: viewportLeft, top: viewportTop } = containerRect;
       const { width, height } = containerRect;
 
-      // WICHTIG: getBoundingClientRect gibt Positionen relativ zum Viewport zurück
-      // clientX/Y sind ebenfalls relativ zum Viewport, daher brauchen wir hier KEINEN Scroll-Offset
-      // Wir verwenden direkt die Koordinaten aus containerRect
-      const viewportLeft = containerRect.left;
-      const viewportTop = containerRect.top;
-
-      // Drop event coordinates (auch relativ zum Viewport)
-      const clientX = data.e.clientX;
-      const clientY = data.e.clientY;
-
-      // Convert viewport-relative position to percentage within container
-      // Da sowohl clientX/Y als auch containerRect.left/top relativ zum Viewport sind,
-      // funktioniert diese Berechnung auch bei gescrollten Seiten
-      const xPercent = Number(
-        (((clientX - viewportLeft) / width) * 100).toFixed(2)
-      );
-      const yPercent = Number(
-        (((clientY - viewportTop) / height) * 100).toFixed(2)
-      );
-
-      // Update cached dimensions
-      containerDimensions.value = {
-        ...containerDimensions.value,
-        left: containerRect.left,
-        top: containerRect.top,
-        width,
-        height,
-      };
-
-      // Log position details for debugging
-      console.log({
-        container: {
-          left: containerRect.left,
-          top: containerRect.top,
-          width,
-          height,
-        },
-        event: { x: clientX, y: clientY },
-        percent: { x: xPercent, y: yPercent },
-      });
+      // Position in Prozent berechnen
+      const xPercent = Number((((clientX - viewportLeft) / width) * 100).toFixed(2));
+      const yPercent = Number((((clientY - viewportTop) / height) * 100).toFixed(2));
 
       // Validate the drop position is within container bounds
       if (xPercent < 0 || xPercent > 100 || yPercent < 0 || yPercent > 100) {
-        console.warn("[WARNING-PITCH] Drop outside of container boundaries", {
-          x: xPercent,
-          y: yPercent,
-        });
-        // Make sure to clear any highlights if dropping outside the field
+        console.warn("[WARNING-PITCH] Drop outside of container boundaries", { x: xPercent, y: yPercent });
         clearMarkerHighlights();
         return;
       }
 
-      // Check if there's a tactic selected and if it has position markers
-      let positioningResult;
+      // Initialisiere positioningResult
+      let positioningSuccess = false;
 
-      // If no markers to show, just place player at exact drop location without any marker logic
-      if (!shouldShowMarkers.value) {
-        // Check if the player is already at this position to prevent recursive updates
-        const existingPlayer = fieldPlayers.value.find(
-          (p) => p.id === playerId
-        );
-        if (
-          existingPlayer &&
-          Math.abs(existingPlayer.percentX - xPercent) < 1 &&
-          Math.abs(existingPlayer.percentY - yPercent) < 1
-        ) {
-          // Player is already close to this position, don't update to prevent recursive updates
-          positioningResult = { success: true };
+      // Taktik-basierte Entscheidungslogik: Marker oder freies Platzieren
+      if (shouldShowMarkers.value) {
+        // TAKTIK-MODUS: Marker-basierte Positionierung mit Snapping
+        const closestMarker = highlightClosestMarker(xPercent, yPercent);
+        
+        if (closestMarker && closestMarker.shouldSnap) {
+          // Position zum nächsten Marker snappen
+          const { x: targetX, y: targetY } = closestMarker;
+          
+          // Prüfen ob Position bereits besetzt ist
+          const playerAtPosition = fieldPlayers.value.find(p => 
+            p.id !== playerId && 
+            Math.abs(p.percentX - targetX) < 3 && 
+            Math.abs(p.percentY - targetY) < 3
+          );
+          
+          if (playerAtPosition) {
+            // Position ist besetzt - Spieler tauschen
+            console.log("[INFO-PITCH] Position already occupied, swapping players");
+            positioningSuccess = store.swapPlayers(playerId, playerAtPosition.id);
+            console.log("[INFO-PITCH] Swap result:", positioningSuccess);
+          } else {
+            // Position ist frei - Spieler platzieren
+            positioningSuccess = playerService.handlePlayerPositioning(playerId, targetX, targetY);
+          }
         } else {
-          positioningResult = playerService.handlePlayerPositioning(
-            playerId,
-            xPercent,
-            yPercent
-          );
-        }
-        return;
-      }
-
-      // Check for nearby position markers for snapping (only for non-free tactics)
-      const closestMarker = highlightClosestMarker(xPercent, yPercent);
-
-      // Handle player positioning with closest marker
-      if (closestMarker && closestMarker.shouldSnap) {
-        // Get coordinates from the closest marker
-        const targetX = closestMarker.x;
-        const targetY = closestMarker.y;
-
-        // Check if position is already occupied
-        const playerAtPosition = fieldPlayers.value.find(
-          (p) =>
-            p.id !== playerId && // not the current player
-            Math.abs(p.percentX - targetX) < 3 && // approximately same X position
-            Math.abs(p.percentY - targetY) < 3 // approximately same Y position
-        );
-
-        const currentPlayer = fieldPlayers.value.find((p) => p.id === playerId);
-
-        if (playerAtPosition) {
-          console.log(
-            "[INFO-PITCH] Position already occupied by player",
-            playerAtPosition.id
-          );
-
+          // Kein Marker in Reichweite - Spieler an ursprüngliche Position zurücksetzen
+          console.log("[INFO-PITCH] No marker in range for tactical position, returning player");
+          
+          const currentPlayer = fieldPlayers.value.find(p => p.id === playerId);
           if (currentPlayer) {
-            // Both players on field - swap positions
-            console.log("[INFO-PITCH] Swapping positions between players");
-            positioningResult = store.swapPlayers(
-              playerId,
-              playerAtPosition.id
-            );
+            // Bereits auf dem Feld - nicht bewegen
+            positioningSuccess = true;
           } else {
-            // New player from bench - use swap method for consistency
-            console.log(
-              "[INFO-PITCH] Swapping player from bench with field player"
-            );
-            // Use swapPlayers instead of separate movePlayerToBench + handlePlayerPositioning
-            positioningResult = store.swapPlayers(
-              playerId,
-              playerAtPosition.id
-            );
-          }
-        } else {
-          // Position is free - place player normally
-          // Check if player is already close to the position to prevent recursive updates
-          const existingPlayer = fieldPlayers.value.find(
-            (p) => p.id === playerId
-          );
-          if (
-            existingPlayer &&
-            Math.abs(existingPlayer.percentX - targetX) < 1 &&
-            Math.abs(existingPlayer.percentY - targetY) < 1
-          ) {
-            // Player is already at the target position, don't update
-            positioningResult = { success: true };
-          } else {
-            positioningResult = playerService.handlePlayerPositioning(
-              playerId,
-              targetX,
-              targetY
-            );
+            // Von der Bank - zurück zur Bank
+            positioningSuccess = store.movePlayerToBench(playerId);
           }
         }
-
-        // Remove highlights after positioning
-        clearMarkerHighlights();
       } else {
-        // If no marker is close enough, return player to their original position
-        console.log(
-          "[INFO-PITCH] No close marker found, returning player to original position"
-        );
-
-        // Find if this player is already on the field
-        const currentPlayer = fieldPlayers.value.find((p) => p.id === playerId);
-
-        if (currentPlayer) {
-          // If already on field, just keep at original position - no need to update position
-          console.log("[INFO-PITCH] Player kept at original position");
-          // Don't update position, just indicate success to avoid recursive updates
-          positioningResult = { success: true };
-        } else {
-          // If from bench, return to bench
-          console.log("[INFO-PITCH] Player returned to bench");
-          store.movePlayerToBench(playerId);
-          positioningResult = { success: true };
-        }
+        // FREIER MODUS: Direkte Platzierung an Drop-Position
+        console.log("[INFO-PITCH] Free placement mode, positioning at", { x: xPercent, y: yPercent });
+        positioningSuccess = playerService.handlePlayerPositioning(playerId, xPercent, yPercent);
       }
 
-      // Handle any positioning errors
-      if (!positioningResult?.success) {
-        console.error(
-          "[ERROR-PITCH] Positioning failed:",
-          positioningResult?.error
-        );
+      // Highlights entfernen
+      clearMarkerHighlights();
+
+      // Nur im Fehlerfall loggen
+      if (!positioningSuccess) {
+        console.error("[ERROR-PITCH] Positioning failed");
       }
     },
     handleNodeBlur(data, state) {

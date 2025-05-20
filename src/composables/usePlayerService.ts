@@ -16,29 +16,12 @@ export interface PlayerService {
   movePlayer(
     playerId: string,
     options: { x?: number; y?: number; location?: "bench" | "pitch" }
-  ): {
-    success: boolean;
-    player?: Player;
-    error?: string;
-    changes?: any;
-  };
+  ): boolean;
   handlePlayerPositioning(
     playerId: string,
     targetX: number,
     targetY: number
-  ): {
-    success: boolean;
-    player?: Player;
-    error?: string;
-    coords?: { x: number; y: number };
-    swapped?: string;
-  };
-  findClosestMarker(
-    x: number,
-    y: number,
-    markers: Array<{ xPercent: number; yPercent: number }>
-  ): { xPercent: number; yPercent: number } | null;
-  redistributePlayers(): void;
+  ): boolean;
 }
 
 /**
@@ -79,20 +62,20 @@ export function providePlayerService(): PlayerService {
   // Service-Objekt mit allen Methoden
   const playerService: PlayerService = {
     // Spieler-Zugriffsmethoden
-    findPlayer(playerId) {
+    findPlayer(playerId): Player | undefined {
       return store.findPlayerById(playerId);
     },
 
-    getBenchPlayers() {
+    getBenchPlayers(): Player[] {
       return store.benchPlayers;
     },
 
-    getPitchPlayers() {
+    getPitchPlayers(): Player[] {
       return store.fieldPlayers;
     },
 
     // Datenmanipulations-Methoden
-    addPlayer(playerData) {
+    addPlayer(playerData): boolean {
       // Duplikatprüfung
       if (this.isDuplicate(playerData)) {
         return false;
@@ -105,7 +88,7 @@ export function providePlayerService(): PlayerService {
       this.resolveNameConflicts(player);
 
       // Zum Store hinzufügen (standardmäßig auf die Bank)
-      const playerId = store.addPlayer(player);
+      store.addPlayer(player);
       return true;
     },
 
@@ -146,10 +129,10 @@ export function providePlayerService(): PlayerService {
       }
     },
 
-    movePlayer(playerId, options) {
+    movePlayer(playerId, options): boolean {
       const player = this.findPlayer(playerId);
       if (!player) {
-        return { success: false, error: "PLAYER_NOT_FOUND" };
+        return false;
       }
 
       let result = false;
@@ -178,21 +161,14 @@ export function providePlayerService(): PlayerService {
         );
       }
 
-      // Nach der Änderung (Player-Objekt wurde aktualisiert)
-      const updatedPlayer = this.findPlayer(playerId);
-
-      return {
-        success: result,
-        player: updatedPlayer,
-        changes: options,
-      };
+      return result;
     },
 
     handlePlayerPositioning(playerId, targetX, targetY) {
       console.log("handlePlayerPositioning", playerId, targetX, targetY);
       const player = this.findPlayer(playerId);
       if (!player) {
-        return { success: false, error: "PLAYER_NOT_FOUND" };
+        return false;
       }
 
       // Validiere die Eingabeparameter
@@ -206,14 +182,14 @@ export function providePlayerService(): PlayerService {
           targetX,
           targetY,
         });
-        return { success: false, error: "INVALID_COORDINATES" };
+        return false;
       }
 
       // Direkte Positionierung ohne Snap-Logik oder Kollisionserkennung
       let result = false;
 
       // Prüfen, ob der Spieler bereits auf dem Feld ist oder neu hinzugefügt wird
-      if (player.location === "bench") {
+      if (store.getPlayerLocation(playerId) === "bench") {
         // Spieler ist auf der Bank und muss zum Feld bewegt werden
         result = store.movePlayerToField(playerId, targetX, targetY);
         if (!result) {
@@ -221,7 +197,7 @@ export function providePlayerService(): PlayerService {
             player,
             coords: { x: targetX, y: targetY },
           });
-          return { success: false, error: "MOVE_TO_FIELD_FAILED" };
+          return false;
         }
       } else {
         // Spieler ist bereits auf dem Feld, nur Position aktualisieren
@@ -231,28 +207,11 @@ export function providePlayerService(): PlayerService {
             player,
             coords: { x: targetX, y: targetY },
           });
-          return { success: false, error: "UPDATE_POSITION_FAILED" };
+          return false;
         }
       }
 
-      // Player-Objekt nach der Store-Operation neu abrufen
-      const updatedPlayer = this.findPlayer(playerId);
-
-      return {
-        success: true,
-        player: updatedPlayer,
-        coords: { x: targetX, y: targetY },
-      };
-    },
-
-    // Diese Methode wird nicht mehr benötigt, aber wir behalten sie im Interface
-    findClosestMarker(x, y, markers) {
-      // Leere Implementierung, da wir diese Funktionalität nicht mehr verwenden
-      return null;
-    },
-
-    redistributePlayers() {
-      // Noch nicht implementiert
+      return true;
     },
   };
 

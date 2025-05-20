@@ -1,14 +1,12 @@
 /**
  * Player-Klasse für das Domain-Modell
  */
-export type PlayerLocation = 'bench' | 'pitch';
 
 export interface PlayerData {
   id?: string;
   number: number;
   firstName: string;
   lastName?: string;
-  location?: PlayerLocation;
   percentX?: number;
   percentY?: number;
   displayName?: string;
@@ -19,7 +17,7 @@ export class Player {
   number: number;
   firstName: string;
   lastName: string;
-  location: PlayerLocation;
+
   percentX: number;
   percentY: number;
   displayName: string;
@@ -29,7 +27,6 @@ export class Player {
     this.number = data.number;
     this.firstName = data.firstName;
     this.lastName = data.lastName || "";
-    this.location = data.location || "bench";
     this.percentX = data.percentX || 0;
     this.percentY = data.percentY || 0;
     this.displayName = data.displayName || this.firstName;

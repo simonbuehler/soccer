@@ -77,7 +77,6 @@ function parsePlayerInput(line: string): PlayerData {
     number,
     firstName: firstNameStr,
     lastName: lastNameStr || "",
-    location: "bench",
     percentX: 0,
     percentY: 0,
   };
