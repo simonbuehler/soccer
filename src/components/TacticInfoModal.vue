@@ -1,18 +1,16 @@
 <script setup>
-  import { computed } from "vue";
-  import { useAppStore } from "@/stores/appStore";
+  import { computed, onMounted, watch } from "vue";
+  import { useTacticManager } from "@/composables/useTacticManager";
 
-  const appStore = useAppStore();
-  const currentTactic = computed(() =>
-    appStore.tacticManager.getCurrentTactic()
-  );
+  const tacticManager = useTacticManager();
+  const currentTactic = tacticManager.getCurrentTactic();
 
   const emit = defineEmits(["close"]);
 </script>
 
 <template>
   <div
-    class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center px-4"
+    class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center px-4 z-[999]"
   >
     <div
       class="relative mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white"
@@ -44,7 +42,7 @@
       <div class="mt-3 space-y-4">
         <div>
           <h4 class="font-semibold text-gray-800">Spieleranzahl:</h4>
-          <p>{{ currentTactic?.playerCount || '7' }}</p>
+          <p>{{ currentTactic?.playerCount || "7" }}</p>
         </div>
 
         <div v-if="currentTactic?.description">
@@ -55,22 +53,26 @@
         <div v-if="currentTactic?.bulletpoints?.length">
           <h4 class="font-semibold text-gray-800">Merkmale:</h4>
           <ul class="list-disc pl-5 space-y-1">
-            <li v-for="(point, index) in currentTactic.bulletpoints" :key="index">
+            <li
+              v-for="(point, index) in currentTactic.bulletpoints"
+              :key="index"
+            >
               {{ point }}
             </li>
           </ul>
         </div>
 
-        <div v-if="currentTactic?.extendedDescription">
+        <div>
           <h4 class="font-semibold text-gray-800">Details:</h4>
           <p
+            v-if="currentTactic?.extendedDescription"
             class="text-sm text-gray-700 leading-relaxed whitespace-pre-line"
-            v-html="currentTactic.extendedDescription.replace(/\n/g, '<br>')"
-          ></p>
-        </div>
-
-        <div v-else class="text-gray-500 italic">
-          Keine erweiterte Beschreibung verfügbar
+          >
+            {{ currentTactic.extendedDescription }}
+          </p>
+          <p v-else class="text-gray-500 italic">
+            Keine erweiterte Beschreibung verfügbar
+          </p>
         </div>
       </div>
     </div>

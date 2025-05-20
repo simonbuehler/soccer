@@ -16,7 +16,11 @@
 
   // Drag and drop functionality
   import { dragAndDrop } from "@formkit/drag-and-drop/vue";
-  import { dropOrSwap, state } from "@formkit/drag-and-drop";
+  import {
+    dropOrSwap,
+    state,
+    handleEnd as coreHandleEnd,
+  } from "@formkit/drag-and-drop";
 
   // Components
   import PositionMarker from "./PositionMarker.vue";
@@ -440,6 +444,9 @@
     },
     handleNodeDrop(data, state) {
       // Placeholder for node drop handling
+    },
+    handleEnd(state) {
+      coreHandleEnd(state);
     },
   });
 </script>

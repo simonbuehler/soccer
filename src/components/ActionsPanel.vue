@@ -1,6 +1,7 @@
 <script setup>
   import { ref, computed } from "vue";
   import { useTacticManager } from "@/composables/useTacticManager";
+  import TacticInfoModal from "@/components/TacticInfoModal.vue";
 
   const tacticManager = useTacticManager();
   const showTacticInfo = ref(false);
@@ -46,18 +47,26 @@
     <h2 class="text-xl font-bold text-gray-800 border-b pb-2">Aktionen</h2>
     <div class="mt-4 flex flex-wrap justify-center gap-3">
       <!-- Spielart Auswahl -->
-      <div class="w-full flex gap-1 bg-gray-100 p-1 rounded-lg">
-        <button
-          v-for="type in gameTypes"
-          :key="type.value"
-          @click="setGameType(type.value)"
-          class="flex-1 py-2 px-3 rounded-md transition-colors"
-          :class="{
-            active: currentGameType === type.value,
-          }"
+      <div class="w-full mb-3">
+        <label class="block text-sm font-medium text-gray-700 mb-2"
+          >Spielfeldgröße:</label
         >
-          {{ type.label }}
-        </button>
+        <div class="flex gap-3 bg-gray-100 p-1.5 rounded-xl">
+          <button
+            v-for="type in gameTypes"
+            :key="type.value"
+            @click="setGameType(type.value)"
+            class="flex-1 py-2.5 px-3 rounded-lg transition-all duration-200 font-medium text-center"
+            :class="{
+              'bg-green-700 text-white shadow-lg transform scale-105':
+                currentGameType === type.value,
+              'bg-white text-gray-700 hover:bg-gray-50 hover:shadow':
+                currentGameType !== type.value,
+            }"
+          >
+            {{ type.label }}
+          </button>
+        </div>
       </div>
 
       <!-- Taktik Auswahl -->
@@ -135,5 +144,8 @@
         Drucken
       </button>
     </div>
+
+    <!-- Tactic Info Modal -->
+    <TacticInfoModal v-if="showTacticInfo" @close="showTacticInfo = false" />
   </div>
 </template>
