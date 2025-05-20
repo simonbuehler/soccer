@@ -1,141 +1,154 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick, watch } from "vue";
-import { usePlayerService } from "@/composables/usePlayerService";
-import { PlayerData } from "@/core/models/Player";
+  import { ref, onMounted, nextTick, watch } from "vue";
+  import { usePlayerService } from "@/composables/usePlayerService";
+  import { PlayerData } from "@/core/models/Player";
 
-// Definiere isOpen prop
-const props = defineProps({
-  modelValue: {
-    type: Boolean,
-    default: false,
-  },
-});
+  // Definiere isOpen prop
+  const props = defineProps({
+    modelValue: {
+      type: Boolean,
+      default: false,
+    },
+  });
 
-const emit = defineEmits(["update:modelValue", "added"]);
-const playerInput = ref("");
-const inputRef = ref(null);
-const playerService = usePlayerService();
-const errors = ref([]);
+  const emit = defineEmits(["update:modelValue", "added"]);
+  const playerInput = ref("");
+  const inputRef = ref(null);
+  const playerService = usePlayerService();
+  const errors = ref([]);
 
-// Fokus auf das Textarea setzen, wenn der Dialog geöffnet wird
-watch(
-  () => props.modelValue,
-  async (isOpen) => {
-    if (isOpen) {
-      await nextTick();
-      inputRef.value?.focus();
-    }
-  }
-);
-
-// Handle close
-function closeDialog() {
-  emit("update:modelValue", false);
-}
-
-function parsePlayerInput(line: string): PlayerData {
-  let numberStr, firstNameStr, lastNameStr;
-
-  const parts = line.split(",");
-  if (parts.length >= 2) {
-    const numberPartRaw = parts[0].trim();
-    // Extrahiere nur den ersten Vornamen, falls mehrere angegeben sind
-    firstNameStr = parts[1].trim().split(/\s+/)[0].trim();
-
-    const numberAndLastName = numberPartRaw.split(/\s+/);
-    numberStr = numberAndLastName[0].trim();
-    lastNameStr =
-      numberAndLastName.length > 1 ? numberAndLastName.slice(1).join(" ").trim() : "";
-
-    if (parts.length > 2) {
-      lastNameStr = parts.slice(1).join(",").trim().split(/\s+/).slice(1).join(" ");
-      // Bei komplexeren Eingaben ebenfalls nur den ersten Vornamen nehmen
-      firstNameStr = parts[1].trim().split(/\s+/)[0].trim();
-    }
-  } else {
-    const spaceParts = line.split(/\s+/);
-    if (spaceParts.length >= 2) {
-      numberStr = spaceParts[0].trim();
-      // Nur den ersten Vornamen nehmen
-      firstNameStr = spaceParts[1].trim();
-      lastNameStr = spaceParts.length > 2 ? spaceParts.slice(2).join(" ").trim() : "";
-    } else {
-      throw new Error(`Ungültiges Spielerformat: "${line}"`);
-    }
-  }
-
-  if (!numberStr || !firstNameStr) {
-    throw new Error(`Fehlende Nummer oder Vorname: "${line}"`);
-  }
-
-  const number = parseInt(numberStr);
-  if (isNaN(number)) {
-    throw new Error(`Ungültige Spielernummer: "${numberStr}"`);
-  }
-
-  return {
-    number,
-    firstName: firstNameStr,
-    lastName: lastNameStr || "",
-    percentX: 0,
-    percentY: 0,
-  };
-}
-
-function addPlayers() {
-  const inputText = playerInput.value.trim();
-  if (!inputText) return;
-
-  errors.value = [];
-  let addedCount = 0;
-
-  inputText
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line)
-    .forEach((line) => {
-      try {
-        const playerData = parsePlayerInput(line);
-
-        // Nutze playerService.addPlayer statt playerPool.addPlayer
-        if (playerService.addPlayer(playerData)) {
-          addedCount++;
-        } else {
-          // Spieler existiert bereits
-          errors.value.push(`${line}: Spieler existiert bereits`);
-        }
-      } catch (e) {
-        // Fehler beim Parsen der Eingabe
-        errors.value.push(`${line}: ${(e as Error).message}`);
+  // Fokus auf das Textarea setzen, wenn der Dialog geöffnet wird
+  watch(
+    () => props.modelValue,
+    async (isOpen) => {
+      if (isOpen) {
+        await nextTick();
+        inputRef.value?.focus();
       }
-    });
+    }
+  );
 
-  if (addedCount > 0) {
-    playerInput.value = "";
-    emit("added", addedCount);
+  // Handle close
+  function closeDialog() {
+    emit("update:modelValue", false);
+  }
 
-    // Wenn alle Spieler erfolgreich hinzugefügt wurden (keine Fehler), Dialog schließen
-    if (errors.value.length === 0) {
-      closeDialog();
+  function parsePlayerInput(line: string): PlayerData {
+    let numberStr, firstNameStr, lastNameStr;
+
+    const parts = line.split(",");
+    if (parts.length >= 2) {
+      const numberPartRaw = parts[0].trim();
+      // Extrahiere nur den ersten Vornamen, falls mehrere angegeben sind
+      firstNameStr = parts[1].trim().split(/\s+/)[0].trim();
+
+      const numberAndLastName = numberPartRaw.split(/\s+/);
+      numberStr = numberAndLastName[0].trim();
+      lastNameStr =
+        numberAndLastName.length > 1
+          ? numberAndLastName.slice(1).join(" ").trim()
+          : "";
+
+      if (parts.length > 2) {
+        lastNameStr = parts
+          .slice(1)
+          .join(",")
+          .trim()
+          .split(/\s+/)
+          .slice(1)
+          .join(" ");
+        // Bei komplexeren Eingaben ebenfalls nur den ersten Vornamen nehmen
+        firstNameStr = parts[1].trim().split(/\s+/)[0].trim();
+      }
+    } else {
+      const spaceParts = line.split(/\s+/);
+      if (spaceParts.length >= 2) {
+        numberStr = spaceParts[0].trim();
+        // Nur den ersten Vornamen nehmen
+        firstNameStr = spaceParts[1].trim();
+        lastNameStr =
+          spaceParts.length > 2 ? spaceParts.slice(2).join(" ").trim() : "";
+      } else {
+        throw new Error(`Ungültiges Spielerformat: "${line}"`);
+      }
+    }
+
+    if (!numberStr || !firstNameStr) {
+      throw new Error(`Fehlende Nummer oder Vorname: "${line}"`);
+    }
+
+    const number = parseInt(numberStr);
+    if (isNaN(number)) {
+      throw new Error(`Ungültige Spielernummer: "${numberStr}"`);
+    }
+
+    return {
+      number,
+      firstName: firstNameStr,
+      lastName: lastNameStr || "",
+      percentX: 0,
+      percentY: 0,
+    };
+  }
+
+  function addPlayers() {
+    const inputText = playerInput.value.trim();
+    if (!inputText) return;
+
+    errors.value = [];
+    let addedCount = 0;
+
+    inputText
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line)
+      .forEach((line) => {
+        try {
+          const playerData = parsePlayerInput(line);
+
+          // Nutze playerService.addPlayer statt playerPool.addPlayer
+          if (playerService.addPlayer(playerData)) {
+            addedCount++;
+          } else {
+            // Spieler existiert bereits
+            errors.value.push(`${line}: Spieler existiert bereits`);
+          }
+        } catch (e) {
+          // Fehler beim Parsen der Eingabe
+          errors.value.push(`${line}: ${(e as Error).message}`);
+        }
+      });
+
+    if (addedCount > 0) {
+      playerInput.value = "";
+      emit("added", addedCount);
+
+      // Wenn alle Spieler erfolgreich hinzugefügt wurden (keine Fehler), Dialog schließen
+      if (errors.value.length === 0) {
+        closeDialog();
+      }
     }
   }
-}
 
-function closeErrorsOnly() {
-  errors.value = [];
-}
+  function closeErrorsOnly() {
+    errors.value = [];
+  }
 </script>
 
 <template>
   <Teleport to="body">
     <div
       v-if="modelValue"
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      style="z-index: 10000"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
       role="dialog"
       aria-labelledby="dialog-title"
       @keydown.esc="closeDialog"
     >
-      <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4" @click.stop>
+      <div
+        class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4"
+        @click.stop
+      >
         <h2 id="dialog-title" class="text-2xl font-bold text-gray-800 mb-4">
           Spieler hinzufügen
         </h2>
@@ -199,9 +212,9 @@ function closeErrorsOnly() {
 </template>
 
 <style>
-/* Füge ein spezifisches Styling für die Fehleranzeige hinzu */
-.error-notification {
-  z-index: 100;
-  position: relative;
-}
+  /* Füge ein spezifisches Styling für die Fehleranzeige hinzu */
+  .error-notification {
+    z-index: 100;
+    position: relative;
+  }
 </style>

@@ -15,21 +15,16 @@
   const positionStyle = computed(() => ({
     left: `${props.player.percentX}%`,
     top: `${props.player.percentY}%`,
+    pointerEvents: props.disablePointerEvents ? "none" : "auto",
   }));
-
-  const containerClasses = computed(() => [
-    "player-token absolute flex flex-col items-center justify-center cursor-move transition-all duration-200",
-    props.disablePointerEvents ? "pointer-events-none" : "",
-  ]);
 </script>
 
 <template>
   <div
     class="player-token absolute flex flex-col items-center justify-center cursor-move transition-all duration-200"
-    :class="containerClasses"
     :style="{
       ...positionStyle,
-      transform: `translate(-50%, -50%) !important`,
+      transform: 'translate(-50%, -50%)',
     }"
     :data-player-id="player.id"
   >

@@ -11,7 +11,6 @@
   const hasPlayersOnBench = computed(() => benchPlayers.value.length > 0);
   const hasPlayersOnField = computed(() => fieldPlayers.value.length > 0);
 
-
   const showEmptyGamePlaceholder = computed(
     () => !hasPlayersOnBench.value && !hasPlayersOnField.value
   );
@@ -50,7 +49,8 @@
       <div
         v-for="player in benchPlayers"
         :key="player.id"
-        class="player bg-gradient-to-br from-blue-500 to-blue-700 text-white px-3 py-2 rounded-lg cursor-move transition-all duration-200 hover:-translate-y-1 hover:shadow-lg shadow-md min-w-32"
+        class="player bg-gradient-to-br from-blue-500 to-blue-700 text-white px-3 py-2 rounded-lg cursor-move transition-all duration-200 hover:-translate-y-1 hover:shadow-lg shadow-md min-w-32 select-none touch-none"
+        :data-id="player.id"
       >
         <div class="flex items-center gap-3 relative">
           <!-- Hintergrundnummer entfernt, da sie redundant ist -->

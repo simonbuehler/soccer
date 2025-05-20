@@ -1,10 +1,11 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
-import App from "./App.vue";
+import type { App } from "vue";
+import AppComponent from "./App.vue";
 import router from "./router";
 
 // App erstellen
-const app = createApp(App);
+const app: App = createApp(AppComponent);
 app.use(router);
 const pinia = createPinia();
 app.use(pinia);
