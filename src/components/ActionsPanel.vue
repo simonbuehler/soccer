@@ -6,7 +6,7 @@
   const showTacticInfo = ref(false);
 
   // Event Emits definieren
-  const emit = defineEmits(['open-player-dialog', 'print']);
+  const emit = defineEmits(["open-player-dialog", "print"]);
 
   const gameTypes = [
     { value: 7, label: "7er" },
@@ -23,15 +23,19 @@
   }
 
   function setTactic(tacticName) {
-    tacticManager.setTactic(tacticName);
+    const result = tacticManager.setTactic(tacticName);
+    if (result) {
+      // Wenn die Taktik erfolgreich gewechselt wurde, Spieler auf die neuen Positionen verteilen
+      tacticManager.redistributePlayers();
+    }
   }
 
   function openPlayerDialog() {
-    emit('open-player-dialog');
+    emit("open-player-dialog");
   }
 
   function print() {
-    emit('print');
+    emit("print");
   }
 </script>
 
@@ -49,7 +53,7 @@
           @click="setGameType(type.value)"
           class="flex-1 py-2 px-3 rounded-md transition-colors"
           :class="{
-            'active': currentGameType === type.value
+            active: currentGameType === type.value,
           }"
         >
           {{ type.label }}

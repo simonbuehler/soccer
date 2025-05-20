@@ -6,32 +6,48 @@
       type: Object,
       required: true,
     },
+    disablePointerEvents: {
+      type: Boolean,
+      default: false,
+    },
   });
 
   const positionStyle = computed(() => ({
     left: `${props.player.percentX}%`,
     top: `${props.player.percentY}%`,
   }));
+
+  const containerClasses = computed(() => [
+    "player-token absolute flex flex-col items-center justify-center cursor-move transition-all duration-200",
+    props.disablePointerEvents ? "pointer-events-none" : "",
+  ]);
 </script>
 
 <template>
   <div
-    class="player-position absolute w-14 h-14 bg-white/90 rounded-full font-bold text-lg shadow-lg cursor-move border-2 border-grey-600 backdrop-blur-sm overflow-hidden"
-    :style="positionStyle"
-    draggable="true"
+    class="player-token absolute flex flex-col items-center justify-center cursor-move transition-all duration-200"
+    :class="containerClasses"
+    :style="{
+      ...positionStyle,
+      transform: `translate(-50%, -50%) !important`,
+    }"
     :data-player-id="player.id"
-    @dragstart="(e) => $emit('dragstart', e, player.id)"
-    @dragend="(e) => $emit('dragend', e, player.id)"
   >
+    <!-- Player visual representation -->
     <div
-      class="absolute inset-0 flex items-center justify-center text-4xl font-bold text-green-600/50"
+      class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-white flex items-center justify-center shadow-lg border-2 border-white relative hover:shadow-xl hover:scale-110 transition-all duration-200 overflow-hidden"
     >
-      {{ player.number }}
-    </div>
-    <div
-      class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 text-xs font-bold text-center text-grey-800"
-    >
-      {{ player.displayName }}
+      <!-- Player number in background -->
+      <div
+        class="absolute inset-0 flex items-center justify-center opacity-30 font-extrabold text-5xl text-white select-none z-0"
+      >
+        {{ player.number || "#" }}
+      </div>
+
+      <!-- Player name in foreground -->
+      <span class="text-sm font-bold tracking-tight z-10 relative">
+        {{ player.displayName || player.firstName }}
+      </span>
     </div>
   </div>
 </template>
