@@ -197,7 +197,6 @@ export function useTacticManager() {
       }
     
       // Create markers from tactic positions
-      const playerAssignmentMap = new Map<string, number>();
       const markers: Position[] = store.currentTactic.positions.map(
         (pos: TacticPosition, index: number) => ({
           x: pos.xPercent || 0,
@@ -230,8 +229,9 @@ export function useTacticManager() {
       // Optimally distribute players to positions
       assignPlayersToPositions(markers);
 
+      const assignedCount = markers.filter(m => m.assigned).length;
       console.debug(
-        `[TACTIC] Redistribution complete - ${playerAssignmentMap.size} of ${markers.length} positions filled`
+        `[TACTIC] Redistribution complete - ${assignedCount} of ${markers.length} positions filled`
       );
       return true;
     } catch (error) {
@@ -243,9 +243,8 @@ export function useTacticManager() {
   // Assigns players to positions based on proximity
   function assignPlayersToPositions(markers: Position[]): void {
     const currentFieldPlayers = [...store.fieldPlayers];
-    const playerAssignmentMap = new Map<string, number>();
     
-      // Sort players by number (lowest first)
+    // Sort players by number (lowest first)
     const sortedPlayers = [...currentFieldPlayers].sort((a, b) => a.number - b.number);
     
       // Assign each player to the most suitable position
@@ -269,15 +268,18 @@ export function useTacticManager() {
         }
       });
 
-      // Assign player to this marker
-      bestMarker.assigned = true;
-      playerAssignmentMap.set(player.id, bestMarker.index!);
-
-      // Update player position
-      console.debug(
-        `[TACTIC] Assigning ${player.firstName} (#${player.number}) to ${bestMarker.role} position`
-      );
-      store.updatePlayerPosition(player.id, bestMarker.x, bestMarker.y);
+      // Assign player to this marker if not already assigned
+      if (!bestMarker.assigned) {
+        bestMarker.assigned = true;
+        console.debug(
+          `[TACTIC] Assigning ${player.firstName} (#${player.number}) to ${bestMarker.role} position`
+        );
+        store.updatePlayerPosition(player.id, bestMarker.x, bestMarker.y);
+      } else {
+        console.debug(
+          `[TACTIC] Position ${bestMarker.role} already assigned - keeping player at current position`
+        );
+      }
     });
   }
 

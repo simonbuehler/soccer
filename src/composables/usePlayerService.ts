@@ -17,10 +17,7 @@ export interface PlayerService {
   addPlayer(playerData: PlayerData): boolean;
   isDuplicate(playerData: PlayerData): boolean;
   resolveNameConflicts(player: Player): void;
-  movePlayer(
-    playerId: string,
-    options: { x?: number; y?: number; location?: "bench" | "pitch" }
-  ): boolean;
+
   handlePlayerPositioning(
     playerId: string,
     targetX: number,
@@ -131,37 +128,6 @@ export function providePlayerService(): PlayerService {
           player.updateDisplayName(false, true);
         }
       }
-    },
-
-    movePlayer(playerId, options): boolean {
-      const player = this.findPlayer(playerId);
-      if (!player) {
-        return false;
-      }
-
-      // Update player position coordinates
-      if (options.x !== undefined || options.y !== undefined) {
-        return store.updatePlayerPosition(
-          playerId,
-          options.x !== undefined ? options.x : player.percentX,
-          options.y !== undefined ? options.y : player.percentY
-        );
-      }
-
-      // Move player between bench and field
-      if (options.location) {
-        if (options.location === "pitch") {
-          return store.movePlayerToField(
-            playerId,
-            player.percentX,
-            player.percentY
-          );
-        } else if (options.location === "bench") {
-          return store.movePlayerToBench(playerId);
-        }
-      }
-
-      return false;
     },
 
     handlePlayerPositioning(playerId, targetX, targetY) {

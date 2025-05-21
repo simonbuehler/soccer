@@ -37,6 +37,7 @@ export const useAppStore = defineStore("app", () => {
 
   /**
    * Moves a player from bench to pitch
+   * Includes player limit check
    * @param playerId - Player ID (or undefined to auto-select first bench player)
    * @param x - X coordinate in percent (0-100)
    * @param y - Y coordinate in percent (0-100)
@@ -49,6 +50,15 @@ export const useAppStore = defineStore("app", () => {
   ): boolean {
     if (x === undefined || y === undefined || isNaN(x) || isNaN(y)) {
       console.error("[AppStore] Invalid coordinates", { x, y });
+      return false;
+    }
+
+    // Check player limit when adding from bench
+    const fromBench = playerId ? benchPlayers.value.some((p) => p.id === playerId) : true;
+    if (fromBench && fieldPlayers.value.length >= gameType.value) {
+      console.warn(
+        `[AppStore] Maximum player count (${gameType.value}) exceeded, preventing move`
+      );
       return false;
     }
 
@@ -132,7 +142,7 @@ export const useAppStore = defineStore("app", () => {
     const player = fieldPlayers.value.find((p) => p.id === playerId);
     if (!player) return false;
 
-      // Only update coordinates if they actually changed
+    // Only update coordinates if they actually changed
     if (player.percentX === Number(x) && player.percentY === Number(y)) {
       return true; // No change needed
     }

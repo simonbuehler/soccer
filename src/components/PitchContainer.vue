@@ -9,14 +9,14 @@
       <!-- Interactive layer - absolute positioned exactly over the SVG -->
       <div class="absolute inset-0 w-full aspect-[2/3] print:h-[850px]" ref="playersContainerRef">
         <!-- Position markers from selected tactic -->
-        <PositionMarker v-for="(marker, index) in positionMarkers" :key="`marker-${index}`" :marker="marker"
-          :is-highlighted="index === highlightedMarkerIndex" />
+        <PositionMarker v-for="(marker, index) in tacticPositions" :key="`marker-${index}`" :marker="marker"
+          :is-highlighted="index === highlightedPositionIndex" />
 
         <!-- Draggable player tokens -->
         <PitchPlayer v-for="player in fieldPlayers" :key="player.id" :player="player"
-          :disablePointerEvents="highlightedPlayerIds.includes(player.id)" />
+          :disablePointerEvents="interactivePlayerIds.includes(player.id)" />
 
-        <!-- Warnung wenn zu viele Spieler -->
+        <!-- Maximum player warning -->
         <div v-if="showMaxPlayersWarning"
           class="absolute top-2 left-0 right-0 mx-auto w-max bg-red-500 text-white px-4 py-2 rounded-md text-sm font-bold shadow-lg animate-bounce">
           Maximale Spieleranzahl erreicht ({{ maxAllowedPlayers }})
@@ -27,17 +27,6 @@
 </template>
 
 <script setup lang="ts">
-/**
- * Interactive Soccer Field Component
- *
- * Features:
- * - Tactical position markers based on selected formation
- * - Draggable player tokens with smart position snapping
- * - Player swapping when dropping on occupied positions
- * - Responsive design for various screen sizes
- * - Print mode support
- */
-
 // Core Vue imports
 import { ref, onMounted, onUnmounted, computed, nextTick } from "vue";
 import { storeToRefs } from "pinia";
@@ -60,6 +49,12 @@ import { useTacticManager } from "@/composables/useTacticManager";
 import { usePlayerService } from "@/composables/usePlayerService";
 import { useAppStore } from "@/stores/appStore";
 
+// Positioning modes enum
+enum PositioningMode {
+  GUIDED = 'guided',
+  FREE = 'free'
+}
+
 // Services
 const tacticManager = useTacticManager();
 const playerService = usePlayerService();
@@ -78,7 +73,7 @@ const svgDimensions = ref({
   top: 0,
 });
 
-// Container dimensions cache (avoids repeated getBoundingClientRect calls)
+// Container dimensions cache
 const containerDimensions = ref({
   width: 0,
   height: 0,
@@ -90,67 +85,56 @@ const containerDimensions = ref({
   thresholdSquared: 0,
 });
 
-// UI state tracking
-const highlightedMarkerIndex = ref(-1);
-// Renamed from playerIdAtHighlightedPosition to highlightedPlayerIds
-const highlightedPlayerIds = ref<string[]>([]);
+// UI and positioning state
+const highlightedPositionIndex = ref(-1);
+const interactivePlayerIds = ref<string[]>([]);
 
-// Maximale Spieleranzahl und Warnungsanzeige
-const maxAllowedPlayers = computed(() => tacticManager.getCurrentGameType());
-const showMaxPlayersWarning = ref(false);
-
-// Track changes to player count
-const isMaxPlayersExceeded = computed(() => {
-  return fieldPlayers.value.length >= maxAllowedPlayers.value;
+// Determine current positioning mode based on tactic
+const positioningMode = computed(() => {
+  const currentTactic = tacticManager.getCurrentTactic();
+  return currentTactic?.positions?.length 
+    ? PositioningMode.GUIDED 
+    : PositioningMode.FREE;
 });
 
-// Show warning when too many players on field
-function checkAndShowWarning() {
-  if (isMaxPlayersExceeded.value) {
+// Computed property to check if in guided mode
+const isGuidedMode = computed(() => {
+  return positioningMode.value === PositioningMode.GUIDED;
+});
+
+/**
+ * Player limit management
+ */
+const maxAllowedPlayers = computed(() => tacticManager.getCurrentGameType());
+const showMaxPlayersWarning = ref(false);
+const isPlayerLimitExceeded = computed(() => fieldPlayers.value.length >= maxAllowedPlayers.value);
+
+/**
+ * Show warning when player limit is exceeded
+ */
+function showPlayerLimitWarning() {
+  if (isPlayerLimitExceeded.value) {
     showMaxPlayersWarning.value = true;
-    setTimeout(() => {
-      showMaxPlayersWarning.value = false;
-    }, 3000);
+    setTimeout(() => { showMaxPlayersWarning.value = false; }, 3000);
   }
 }
 
-/**
- * Determines if position markers should be displayed
- * Returns true for tactics with defined positions (non-free formations)
- */
-const shouldShowMarkers = computed(() => {
-  const currentTactic = tacticManager.getCurrentTactic();
-  return (
-    currentTactic?.positions &&
-    currentTactic.positions.length > 0 &&
-    !currentTactic.name.includes("Frei")
-  );
-});
-
-/**
- * Position markers for the current tactic
- */
-const positionMarkers = computed(() => tacticManager.getPositionMarkers());
+// Tactic position markers
+const tacticPositions = computed(() => tacticManager.getPositionMarkers());
 
 /**
  * Initialize component and setup event listeners
  */
 onMounted(() => {
   nextTick(() => {
-    // Try calculating dimensions after initial render
     setTimeout(() => {
       updateFieldDimensions();
-      // Retry if dimensions are still invalid
       if (!containerDimensions.value.width) {
-        console.log(
-          "[INFO-PITCH] Retrying dimension calculation after delay"
-        );
         setTimeout(updateFieldDimensions, 100);
       }
     }, 50);
   });
 
-  // Add resize listener
   window.addEventListener("resize", updateFieldDimensions);
 });
 
@@ -205,12 +189,9 @@ function updateFieldDimensions() {
 
 /**
  * Finds a player at the given position coordinates
- * @param x - X coordinate as percentage
- * @param y - Y coordinate as percentage
- * @returns Player ID if found, null otherwise
  */
 function findPlayerAtPosition(x: number, y: number): string | null {
-  const margin = 3; // 3% Toleranz
+  const margin = 3; // 3% tolerance
   const playerAtPosition = fieldPlayers.value.find(
     (p) => Math.abs(p.percentX - x) < margin && Math.abs(p.percentY - y) < margin
   );
@@ -218,15 +199,12 @@ function findPlayerAtPosition(x: number, y: number): string | null {
 }
 
 /**
- * Finds all players within radius of a position and highlights them
- * @param xPercent - Horizontal position (0-100%)
- * @param yPercent - Vertical position (0-100%) 
- * @returns Array of found player IDs
+ * Finds all players within radius of a position and marks them as interactive
  */
 function findPlayersInRadius(xPercent: number, yPercent: number): string[] {
   if (!fieldPlayers.value.length) return [];
 
-  const radius = 10; // 10% Radius
+  const radius = 10; // 10% radius
   const radiusSquared = radius * radius;
   const nearbyPlayers: string[] = [];
 
@@ -240,31 +218,23 @@ function findPlayersInRadius(xPercent: number, yPercent: number): string[] {
     }
   });
 
-  highlightedPlayerIds.value = nearbyPlayers;
+  interactivePlayerIds.value = nearbyPlayers;
   return nearbyPlayers;
 }
 
 /**
- * Clears all marker and player highlights
+ * Clears all highlights
  */
 function clearHighlights(): void {
-  highlightedMarkerIndex.value = -1;
-  highlightedPlayerIds.value = [];
+  highlightedPositionIndex.value = -1;
+  interactivePlayerIds.value = [];
 }
 
 /**
- * Finds and highlights the closest position marker
- * @param xPercent - Horizontal position (0-100%)
- * @param yPercent - Vertical position (0-100%)
- * @returns Position data if marker is close enough, otherwise null
+ * Finds and highlights the closest position marker in guided mode
  */
-function highlightClosestMarker(xPercent: number, yPercent: number) {
-  // Exit early if conditions aren't met
-  if (!shouldShowMarkers.value || !containerDimensions.value.width) {
-    return null;
-  }
-
-  if (!positionMarkers.value?.length) {
+function highlightClosestPosition(xPercent: number, yPercent: number) {
+  if (!isGuidedMode.value || !containerDimensions.value.width || !tacticPositions.value?.length) {
     return null;
   }
 
@@ -275,16 +245,14 @@ function highlightClosestMarker(xPercent: number, yPercent: number) {
   const { pixelsPerPercentX, pixelsPerPercentY, thresholdSquared } =
     containerDimensions.value;
 
-  // Calculate distances to all markers
-  positionMarkers.value.forEach((marker) => {
+  tacticPositions.value.forEach((marker) => {
     const markerX = marker.x;
     const markerY = marker.y;
 
-    // Use squared distance for performance (avoid sqrt)
+    // Use squared distance for performance
     const distanceXpx = (xPercent - markerX) * pixelsPerPercentX;
     const distanceYpx = (yPercent - markerY) * pixelsPerPercentY;
-    const distanceSquared =
-      distanceXpx * distanceXpx + distanceYpx * distanceYpx;
+    const distanceSquared = distanceXpx * distanceXpx + distanceYpx * distanceYpx;
 
     if (distanceSquared < minDistance && marker.index !== undefined) {
       minDistance = distanceSquared;
@@ -295,23 +263,18 @@ function highlightClosestMarker(xPercent: number, yPercent: number) {
   // If a marker is close enough, highlight it
   if (closestIndex !== -1 && minDistance < thresholdSquared) {
     clearHighlights();
-    highlightedMarkerIndex.value = closestIndex;
+    highlightedPositionIndex.value = closestIndex;
 
-    const closestMarker = positionMarkers.value.find(
+    const closestMarker = tacticPositions.value.find(
       (m) => m.index === closestIndex
     );
 
-    if (!closestMarker) {
-      console.error("[ERROR-PITCH] Could not find marker with index", closestIndex);
-      return null;
-    }
+    if (!closestMarker) return null;
 
     // Check for player at this position
     const playerId = findPlayerAtPosition(closestMarker.x, closestMarker.y);
-
-    // If player found, add to array
     if (playerId) {
-      highlightedPlayerIds.value = [playerId];
+      interactivePlayerIds.value = [playerId];
     }
 
     return {
@@ -321,7 +284,6 @@ function highlightClosestMarker(xPercent: number, yPercent: number) {
     };
   }
 
-  // No marker close enough
   clearHighlights();
   return null;
 }
@@ -337,34 +299,24 @@ dragAndDrop<Player>({
   values: fieldPlayers,
   plugins: [
     dropOrSwap({
-      // Handle dragging over the pitch to highlight position markers and make players non-interactive
       handleParentDragover: (data, state) => {
         // Get mouse coordinates from drag event
         const clientX = data.e.clientX;
         const clientY = data.e.clientY;
-
-        // Get current container position (accounts for scrolling and resizing)
-        const containerRect =
-          playersContainerRef.value.getBoundingClientRect();
+        const containerRect = playersContainerRef.value.getBoundingClientRect();
         const viewportLeft = containerRect.left;
         const viewportTop = containerRect.top;
         const { width, height } = containerDimensions.value;
 
         // Convert to percentage within container
-        const xPercent = Number(
-          (((clientX - viewportLeft) / width) * 100).toFixed(2)
-        );
-        const yPercent = Number(
-          (((clientY - viewportTop) / height) * 100).toFixed(2)
-        );
+        const xPercent = Number((((clientX - viewportLeft) / width) * 100).toFixed(2));
+        const yPercent = Number((((clientY - viewportTop) / height) * 100).toFixed(2));
 
         // Only process if coordinates are within field bounds
         if (xPercent >= 0 && xPercent <= 100 && yPercent >= 0 && yPercent <= 100) {
-          if (shouldShowMarkers.value) {
-            // Formation tactic: Highlight closest position marker
-            highlightClosestMarker(xPercent, yPercent);
+          if (isGuidedMode.value) {
+            highlightClosestPosition(xPercent, yPercent);
           } else {
-            // Free formation: Find and highlight players in radius
             findPlayersInRadius(xPercent, yPercent);
           }
         } else {
@@ -384,152 +336,85 @@ dragAndDrop<Player>({
 
   // Handle dropping a player on the pitch
   handleParentDrop: (data, state) => {
-    console.log(
-      "[DEBUG-PITCH] handleParentDrop",
-      state.draggedNode.data.value.id
-    );
-
-    // Extract the dragged player ID from the drag state
+    // Extract the dragged player ID
     const playerId = state.draggedNode.data.value.id;
-    if (!playerId) {
-      console.error(
-        "[ERROR-PITCH] Could not determine player ID for positioning"
-      );
-      return;
-    }
+    if (!playerId) return;
 
-    // Check if player is already on field
-    const alreadyOnField = store.getPlayerLocation(playerId) === "pitch";
-
-    // If player not on field and max players reached,
-    // prevent positioning and show warning
-    if (!alreadyOnField && isMaxPlayersExceeded.value) {
-      console.warn(`[WARNING-PITCH] Maximum player count (${maxAllowedPlayers.value}) exceeded, preventing drop`);
-      checkAndShowWarning();
-      return;
-    }
-
-    // Calculate drop position in container coordinates
+    // Calculate drop position
     const { clientX, clientY } = data.e;
     const containerRect = playersContainerRef.value.getBoundingClientRect();
     const { left: viewportLeft, top: viewportTop } = containerRect;
     const { width, height } = containerRect;
 
-    // Convert to percentage coordinates
-    const xPercent = Number(
-      (((clientX - viewportLeft) / width) * 100).toFixed(2)
-    );
-    const yPercent = Number(
-      (((clientY - viewportTop) / height) * 100).toFixed(2)
-    );
+    const xPercent = Number((((clientX - viewportLeft) / width) * 100).toFixed(2));
+    const yPercent = Number((((clientY - viewportTop) / height) * 100).toFixed(2));
 
     // Validate drop position is within bounds
     if (xPercent < 0 || xPercent > 100 || yPercent < 0 || yPercent > 100) {
-      console.warn("[WARNING-PITCH] Drop outside of container boundaries", {
-        x: xPercent,
-        y: yPercent,
-      });
       clearHighlights();
       return;
     }
 
     let positioningSuccess = false;
 
-    // Handle positioning based on tactic type
-    if (shouldShowMarkers.value) {
-      // Formation tactic: Use position markers with snapping
-      const closestMarker = highlightClosestMarker(xPercent, yPercent);
+    // Check if player is already on field
+    const alreadyOnField = store.getPlayerLocation(playerId) === "pitch";
+    
+    // Position based on current mode
+    if (isGuidedMode.value) {
+      // Guided mode with position markers
+      const closestMarker = highlightClosestPosition(xPercent, yPercent);
 
-      if (closestMarker && closestMarker.shouldSnap) {
-        // Snap to nearest marker position
+      if (closestMarker?.shouldSnap) {
+        // Snap to marker position
         const { x: targetX, y: targetY } = closestMarker;
 
         // Check if position is already occupied
         const playerAtPosition = fieldPlayers.value.find(
-          (p) =>
-            p.id !== playerId &&
-            Math.abs(p.percentX - targetX) < 3 &&
-            Math.abs(p.percentY - targetY) < 3
+          (p) => p.id !== playerId && 
+                Math.abs(p.percentX - targetX) < 3 && 
+                Math.abs(p.percentY - targetY) < 3
         );
 
         if (playerAtPosition) {
-          // Position occupied - swap players
-          console.log(
-            "[INFO-PITCH] Position already occupied, swapping players"
-          );
-          positioningSuccess = store.swapPlayers(
-            playerId,
-            playerAtPosition.id
-          );
-          console.log("[INFO-PITCH] Swap result:", positioningSuccess);
+          // Swap with existing player
+          positioningSuccess = store.swapPlayers(playerId, playerAtPosition.id);
         } else {
-          // Position is free - place player
+          // Position at marker
           positioningSuccess = playerService.handlePlayerPositioning(
-            playerId,
-            targetX,
-            targetY
+            playerId, targetX, targetY
           );
         }
       } else {
-        // No nearby marker - return player to original position
-        console.log(
-          "[INFO-PITCH] No marker in range for tactical position, returning player"
-        );
-
-        const currentPlayer = fieldPlayers.value.find(
-          (p) => p.id === playerId
-        );
-        if (currentPlayer) {
-          // Already on field - don't move
-          positioningSuccess = true;
-        } else {
-          // From bench - return to bench
-          positioningSuccess = store.movePlayerToBench(playerId);
-        }
+        // No marker nearby - return player if from bench
+        const currentPlayer = fieldPlayers.value.find(p => p.id === playerId);
+        positioningSuccess = currentPlayer ? true : store.movePlayerToBench(playerId);
       }
     } else {
-
-      console.log("[INFO-PITCH] Free placement mode, positioning at", {
-        x: xPercent,
-        y: yPercent,
-      });
-      positioningSuccess = playerService.handlePlayerPositioning(
-        playerId,
-        xPercent,
-        yPercent
-      );
-
+      // Free mode - no swapping allowed, just position player
+      // Only check limit if adding new player
+      if (!alreadyOnField && isPlayerLimitExceeded.value) {
+        showPlayerLimitWarning();
+      } else {
+        positioningSuccess = playerService.handlePlayerPositioning(
+          playerId, xPercent, yPercent
+        );
+      }
     }
 
     // Clean up highlights
     clearHighlights();
-
-    // Log errors
+    
     if (!positioningSuccess) {
       console.error("[ERROR-PITCH] Positioning failed");
     }
   },
-  handleNodeDrop(data, state) {
-
-  },
+  handleNodeDrop() {},
   handleEnd(state) {
-
     coreHandleEnd(state);
   },
 });
 
-// Also add limit for movePlayerToField
-const originalMoveToField = store.movePlayerToField;
-store.movePlayerToField = (id, x, y) => {
-  // If player is new to field and too many players, cancel
-  const playerLocation = id ? store.getPlayerLocation(id) : "bench";
-  if (playerLocation === "bench" && isMaxPlayersExceeded.value) {
-    console.warn(`[WARNING-STORE] Maximum player count (${maxAllowedPlayers.value}) exceeded, preventing move`);
-    checkAndShowWarning();
-    return false;
-  }
-  return originalMoveToField(id, x, y);
-};
 </script>
 
 <style scoped>
