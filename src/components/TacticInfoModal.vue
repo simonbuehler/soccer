@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import type { Tactic } from '@/js/tactics/allTactics'
+import type { Tactic } from '@/core/models/allTactics'
 import { useTacticManager } from '@/composables/useTacticManager'
 
 const tacticManager = useTacticManager()

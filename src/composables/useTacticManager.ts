@@ -3,7 +3,7 @@ import {
   TACTICS,
   type Tactic,
   type TacticPosition,
-} from "@/js/tactics/allTactics";
+} from "@/core/models/allTactics";
 import { ref } from "vue";
 
 /**
