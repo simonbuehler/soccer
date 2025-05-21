@@ -1,16 +1,21 @@
-# Soccer Project ⚽
+# Soccer Tactics Manager ⚽
 
-A modern football/soccer web application built with:
+A modern football/soccer tactics web application built with:
 
+- Vue 3 (Composition API)
+- TypeScript
 - Vite (Frontend Tooling)
 - Tailwind CSS (Styling)
-- JavaScript (Functionality)
+- Pinia (State Management)
 
 ## Features
 
-- Interactive pitch visualization
-- Responsive design
-- Modern UI components
+- Interactive pitch visualization with drag & drop
+- Tactics presets (4-4-2, 4-3-3, 3-5-2 etc.)
+- Player position customization
+- Responsive design for all devices
+- Dark/Light mode support
+- Player statistics tracking
 
 ## Installation
 
@@ -31,24 +36,26 @@ After starting the dev server, open your browser to:
 http://localhost:5173
 ```
 
-## TODOs
-
-- [ ] Taktik-Preset implementieren
-- [ ] Auswahl zwischen 9 und 11 Spielern ermöglichen
-- [ ] Import der Daten aus DFBnet-Spielbericht integrieren
-
 ## Project Structure
 
 ```
 src/
-├── assets/       # Static assets like images
-├── components/   # UI components
-├── js/           # JavaScript files
-└── styles/       # CSS/Tailwind files
+├── assets/        # Static assets
+├── components/    # Vue components
+├── composables/   # Composition API utilities
+├── core/          # Core domain models
+├── js/            # JavaScript utilities
+├── router/        # Vue Router configuration
+├── stores/        # Pinia state stores
+├── styles/        # CSS/Tailwind files
+└── views/         # Page components
 ```
 
 ## Technologies Used
 
+- [Vue 3](https://vuejs.org/)
+- [TypeScript](https://www.typescriptlang.org/)
 - [Vite](https://vitejs.dev/)
 - [Tailwind CSS](https://tailwindcss.com/)
-- [JavaScript](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+- [Pinia](https://pinia.vuejs.org/)
+- [Vue Router](https://router.vuejs.org/)
