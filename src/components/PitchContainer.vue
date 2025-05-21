@@ -3,7 +3,7 @@
     <!-- SVG Container mit fixer Breite und Höhe -->
     <div class="relative w-full lg:w-auto max-w-full">
       <!-- Soccer field SVG background -->
-      <object style="pointer-events: none" :data="'/src/assets/pitch.svg'" type="image/svg+xml"
+      <object style="pointer-events: none" :data="pitchSvgUrl" type="image/svg+xml"
         class="w-full h-auto print:h-[850px] aspect-[2/3] lg:max-h-[calc(100vh-6rem)]" ref="pitchRef"></object>
 
       <!-- Interactive layer - absolute positioned exactly over the SVG -->
@@ -29,6 +29,7 @@
 <script setup lang="ts">
 // Core Vue imports
 import { ref, onMounted, onUnmounted, computed, nextTick } from "vue";
+import pitchSvgUrl from '@/assets/pitch.svg';
 import { storeToRefs } from "pinia";
 
 // Drag and drop functionality
