@@ -6,6 +6,9 @@ import {
 } from "@/js/tactics/allTactics";
 import { ref } from "vue";
 
+/**
+ * Represents a position on the soccer pitch
+ */
 interface Position {
   x: number;
   y: number;
@@ -16,6 +19,9 @@ interface Position {
   yPercent?: number;
 }
 
+/**
+ * Player data structure for tactic management
+ */
 interface Player {
   id: string;
   firstName: string;
@@ -26,6 +32,9 @@ interface Player {
   displayName: string;
 }
 
+/**
+ * App store interface for tactic management
+ */
 interface AppStore {
   gameType: number;
   currentTactic: Tactic | null;
@@ -37,9 +46,16 @@ interface AppStore {
   findPlayerById: (id: string) => Player | undefined;
 }
 
+/**
+ * Composable for managing soccer tactics and player positioning
+ * @returns Object with tactic management methods
+ */
 export function useTacticManager() {
   const store = useAppStore() as unknown as AppStore;
 
+  /**
+   * Initializes game with default settings
+   */
   function initializeGame(): void {
     store.gameType = 7;
     store.currentTactic =
@@ -48,6 +64,11 @@ export function useTacticManager() {
       ) || null;
   }
 
+  /**
+   * Sets the game type (number of players)
+   * @param playerCount - Number of players (e.g. 7 for 7v7)
+   * @returns true if successful, false otherwise
+   */
   function setGameType(playerCount: number): boolean {
     if (store.gameType === playerCount) return false;
 
@@ -62,6 +83,11 @@ export function useTacticManager() {
     return false;
   }
 
+  /**
+   * Sets the current tactic
+   * @param tacticName - Name of the tactic to set
+   * @returns true if successful, false otherwise
+   */
   function setTactic(tacticName: string): boolean {
     if (!tacticName || !store.gameType) return false;
 
@@ -72,25 +98,23 @@ export function useTacticManager() {
     if (!newTactic) return false;
 
     try {
-      console.log(
+      console.debug(
         `[TACTIC] Setting tactic '${tacticName}' for game type ${store.gameType}`
       );
 
-      // Log the current field players before tactic change
-      console.log(
-        `[TACTIC-DEBUG] Current field players before tactic change:`,
+      // Debug log current field players before tactic change
+      console.debug(
+        `[TACTIC] Current field players:`,
         store.fieldPlayers.map(
           (p) =>
-            `${p.firstName} (${p.percentX.toFixed(0)}, ${p.percentY.toFixed(
-              0
-            )})`
+            `${p.firstName} (${p.percentX.toFixed(0)}, ${p.percentY.toFixed(0)})`
         )
       );
 
-      // Log current tactic info
+      // Debug log tactic transition
       const oldTactic = store.currentTactic?.name || "none";
-      console.log(
-        `[TACTIC-DEBUG] Changing tactic from '${oldTactic}' to '${tacticName}'`
+      console.debug(
+        `[TACTIC] Changing from '${oldTactic}' to '${tacticName}'`
       );
       store.currentTactic = { ...newTactic };
 
@@ -101,6 +125,10 @@ export function useTacticManager() {
     }
   }
 
+  /**
+   * Gets position markers for the current tactic
+   * @returns Array of position markers
+   */
   function getPositionMarkers(): Position[] {
     if (!store.currentTactic?.positions?.length) return [];
 
@@ -113,11 +141,15 @@ export function useTacticManager() {
       })
     );
   }
+  /**
+   * Redistributes players according to current tactic
+   * @returns true if successful, false otherwise
+   */
   function redistributePlayers(): boolean {
     try {
       // Check if a valid tactic exists
       if (!store.currentTactic) {
-        console.log("[TACTIC] No tactic set, skipping redistribution");
+        console.debug("[TACTIC] No tactic set - skipping redistribution");
         return false;
       }
 
@@ -132,14 +164,14 @@ export function useTacticManager() {
       // Determine max players allowed
       const maxAllowedPlayers = store.gameType;
       
-      console.log(
-        `[TACTIC] Redistribution started: ${maxAllowedPlayers} positions needed, ${fieldPlayerIds.length} field players, ${benchPlayerIds.length} bench players`
+      console.debug(
+        `[TACTIC] Redistributing ${fieldPlayerIds.length} field players and ${benchPlayerIds.length} bench players to ${maxAllowedPlayers} positions`
       );
       
       // Handle excess players for both free tactics and positioned tactics
       if (fieldPlayers.length > maxAllowedPlayers) {
-        console.log(
-          `[TACTIC] Found ${fieldPlayers.length} players on field but only ${maxAllowedPlayers} allowed`
+        console.debug(
+          `[TACTIC] Moving ${fieldPlayers.length - maxAllowedPlayers} excess players to bench`
         );
 
         // Sort players by priority
@@ -151,8 +183,8 @@ export function useTacticManager() {
         // Move excess players to bench
         playersToMove.forEach((id) => {
           const player = store.findPlayerById(id);
-          console.log(
-            `[TACTIC] Moving excess player ${player?.firstName || id} to bench`
+          console.debug(
+            `[TACTIC] Moving player ${player?.firstName || id} to bench`
           );
           store.movePlayerToBench(id);
         });
@@ -160,7 +192,7 @@ export function useTacticManager() {
 
       // If using a tactic without positions, we're done after limiting player count
       if (!hasPositions) {
-        console.log("[TACTIC] Free tactic processing complete");
+        console.debug("[TACTIC] Free tactic - no position assignments needed");
         return true;
       }
     
@@ -178,28 +210,28 @@ export function useTacticManager() {
         })
       );
 
-      // Ggf. fehlende Spieler von der Bank holen
+      // Get needed players from bench if necessary
       const neededPlayers = markers.length - store.fieldPlayers.length;
       
       if (neededPlayers > 0) {
-        console.log(`[TACTIC] Need ${neededPlayers} players from bench`);
+        console.debug(`[TACTIC] Adding ${neededPlayers} players from bench`);
         
-        // Temporäre Positionen für neue Spieler vom Mittelfeld aus verteilen
+        // Assign temporary midfield positions for new players
         for (let i = 0; i < neededPlayers; i++) {
           const tempX = 50 + (i % 3) * 10;
           const tempY = 50 + Math.floor(i / 3) * 10;
           
-          console.log(`[TACTIC] Moving player from bench to field at temporary position (${tempX}, ${tempY})`);
-          // Store-Methode nutzen, um automatisch einen Spieler auszuwählen
+          console.debug(`[TACTIC] Moving bench player to temporary position (${tempX}, ${tempY})`);
+          // Use store method to auto-select a player
           store.movePlayerToField(undefined, tempX, tempY);
         }
       }
 
-      // Spieler optimal auf Positionen verteilen
+      // Optimally distribute players to positions
       assignPlayersToPositions(markers);
 
-      console.log(
-        `[TACTIC] Redistribution complete: ${playerAssignmentMap.size}/${markers.length} players assigned`
+      console.debug(
+        `[TACTIC] Redistribution complete - ${playerAssignmentMap.size} of ${markers.length} positions filled`
       );
       return true;
     } catch (error) {
@@ -208,15 +240,15 @@ export function useTacticManager() {
     }
   }
 
-  // Vereinfachte Funktion zur Spielerzuordnung ohne separates Keeper-Handling
+  // Assigns players to positions based on proximity
   function assignPlayersToPositions(markers: Position[]): void {
     const currentFieldPlayers = [...store.fieldPlayers];
     const playerAssignmentMap = new Map<string, number>();
     
-    // Sortiere Spieler nach Nummer (niedrigste zuerst)
+      // Sort players by number (lowest first)
     const sortedPlayers = [...currentFieldPlayers].sort((a, b) => a.number - b.number);
     
-    // Jedem Spieler die passendste Position zuweisen
+      // Assign each player to the most suitable position
     sortedPlayers.forEach((player) => {
       const availableMarkers = markers.filter((m) => !m.assigned);
       if (availableMarkers.length === 0) return;
@@ -242,44 +274,58 @@ export function useTacticManager() {
       playerAssignmentMap.set(player.id, bestMarker.index!);
 
       // Update player position
-      console.log(
-        `[TACTIC] Positioning ${player.firstName} (#${player.number}) at ${
-          bestMarker.role
-        } (${bestMarker.x.toFixed(1)}, ${bestMarker.y.toFixed(1)})`
+      console.debug(
+        `[TACTIC] Assigning ${player.firstName} (#${player.number}) to ${bestMarker.role} position`
       );
       store.updatePlayerPosition(player.id, bestMarker.x, bestMarker.y);
     });
   }
 
-  // Verbesserte Spieler-Priorisierung
+  // Prioritizes players for position assignment
   function prioritizePlayers(playerIds: string[]): string[] {
     return [...playerIds].sort((idA, idB) => {
       const playerA = store.findPlayerById(idA);
       const playerB = store.findPlayerById(idB);
       if (!playerA || !playerB) return 0;
       
-      // Priorität 1: Torhüter immer zuerst
+      // Priority 1: Goalkeeper always first
       if (playerA.number === 1) return -1;
       if (playerB.number === 1) return 1;
       
-      // Priorität 2: Sortiere nach Position (von hinten nach vorne)
-      // Nutze die Y-Position als Indikator für die Position auf dem Feld
+      // Priority 2: Sort by position (back to front)
+      // Uses Y-position as indicator for field position
       return playerB.percentY- playerA.percentY ;
     });
   }
 
+  /**
+   * Gets available tactics for current game type
+   * @returns Array of tactics
+   */
   function getTacticsForCurrentGameType(): Tactic[] {
     return TACTICS[store.gameType as keyof typeof TACTICS] || [];
   }
 
+  /**
+   * Gets current game type
+   * @returns Number of players (e.g. 7 for 7v7)
+   */
   function getCurrentGameType(): number {
     return store.gameType;
   }
 
+  /**
+   * Gets current tactic
+   * @returns Current tactic or null if none set
+   */
   function getCurrentTactic(): Tactic | null {
     return store.currentTactic;
   }
 
+  /**
+   * Gets count of players currently on field
+   * @returns Number of field players
+   */
   function getCurrentFieldPlayerCount(): number {
     return store.fieldPlayers.length;
   }

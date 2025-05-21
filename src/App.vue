@@ -1,7 +1,7 @@
 <script setup>
 import { providePlayerService } from './composables/usePlayerService';
 
-// Service bereitstellen, Rückgabewert wird nicht benötigt
+// Provide player service (return value not needed)
 providePlayerService();
 </script>
 

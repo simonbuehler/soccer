@@ -19,7 +19,7 @@
     },
   });
 
-  // Vollständige Tailwind-Klassen basierend auf isRequired und isHighlighted
+  // Complete Tailwind classes based on isRequired and isHighlighted
   const markerClasses = computed(() => {
     const highlightClasses = props.isHighlighted
       ? "animate-pulse-fast border-4 scale-[120%] z-10"

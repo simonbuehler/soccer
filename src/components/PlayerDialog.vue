@@ -3,7 +3,7 @@
   import { usePlayerService } from "@/composables/usePlayerService";
   import { PlayerData } from "@/core/models/Player";
 
-  // Definiere isOpen prop
+  // Define isOpen prop
   const props = defineProps({
     modelValue: {
       type: Boolean,
@@ -12,12 +12,12 @@
   });
 
   const emit = defineEmits(["update:modelValue", "added"]);
-  const playerInput = ref("");
-  const inputRef = ref(null);
+  const playerInput = ref<string>("");
+  const inputRef = ref<HTMLTextAreaElement | null>(null);
   const playerService = usePlayerService();
   const errors = ref([]);
 
-  // Fokus auf das Textarea setzen, wenn der Dialog geöffnet wird
+  // Focus textarea when dialog opens
   watch(
     () => props.modelValue,
     async (isOpen) => {
@@ -28,7 +28,7 @@
     }
   );
 
-  // Handle close
+  // Handle dialog close
   function closeDialog() {
     emit("update:modelValue", false);
   }
@@ -69,17 +69,17 @@
         lastNameStr =
           spaceParts.length > 2 ? spaceParts.slice(2).join(" ").trim() : "";
       } else {
-        throw new Error(`Ungültiges Spielerformat: "${line}"`);
+        throw new Error(`Invalid player format: "${line}"`);
       }
     }
 
     if (!numberStr || !firstNameStr) {
-      throw new Error(`Fehlende Nummer oder Vorname: "${line}"`);
+      throw new Error(`Missing number or first name: "${line}"`);
     }
 
     const number = parseInt(numberStr);
     if (isNaN(number)) {
-      throw new Error(`Ungültige Spielernummer: "${numberStr}"`);
+      throw new Error(`Invalid player number: "${numberStr}"`);
     }
 
     return {
@@ -111,7 +111,7 @@
             addedCount++;
           } else {
             // Spieler existiert bereits
-            errors.value.push(`${line}: Spieler existiert bereits`);
+            errors.value.push(`${line}: Player already exists`);
           }
         } catch (e) {
           // Fehler beim Parsen der Eingabe
@@ -153,7 +153,6 @@
           Spieler hinzufügen
         </h2>
 
-        <!-- Vereinfachte Fehleranzeige -->
         <div
           v-if="errors.length > 0"
           class="mb-4 p-3 bg-red-50 border border-red-300 rounded-lg"

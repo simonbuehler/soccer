@@ -40,12 +40,10 @@
     >
       Ersatzbank
     </h2>
-    <!-- Immer eine Mindesthöhe anwenden, auch wenn keine Spieler vorhanden sind -->
     <div
       ref="benchRef"
       class="mt-4 flex flex-wrap gap-3 w-full print:mt-1 print:gap-1 print:justify-start min-h-20 border-2 border-dashed border-blue-600 rounded-lg p-3 bg-blue-50"
     >
-      <!-- WICHTIG: Jedes Element mit draggable muss auch data-id haben -->
       <div
         v-for="player in benchPlayers"
         :key="player.id"
@@ -53,23 +51,17 @@
         :data-id="player.id"
       >
         <div class="flex items-center gap-3 relative">
-          <!-- Hintergrundnummer entfernt, da sie redundant ist -->
-
-          <!-- Spielernummer im Kreis -->
           <div
             class="w-10 h-10 rounded-full bg-blue-800 flex items-center justify-center font-bold text-lg border border-blue-300 shadow-inner"
           >
             {{ player.number || "#" }}
           </div>
-
-          <!-- Spielername -->
           <span class="font-bold truncate">
             {{ player.displayName }}
           </span>
         </div>
       </div>
 
-      <!-- Unterschiedliche Platzhalter-Nachrichten je nach Zustand -->
       <p
         v-if="showEmptyGamePlaceholder"
         class="text-gray-500 text-sm text-center w-full mt-2 px-4 print:hidden"

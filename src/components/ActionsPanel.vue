@@ -6,7 +6,7 @@ import TacticInfoModal from "@/components/TacticInfoModal.vue";
 const tacticManager = useTacticManager();
 const showTacticInfo = ref(false);
 
-// Event Emits definieren
+// Define component emits
 const emit = defineEmits(["open-player-dialog", "print"]);
 
 const gameTypes = [
@@ -20,13 +20,9 @@ const tactics = computed(() => tacticManager.getTacticsForCurrentGameType());
 const currentGameType = computed(() => tacticManager.getCurrentGameType());
 
 function setGameType(type) {
-  if (currentGameType.value === type) return; // Keine Änderung wenn gleicher Typ
+  if (currentGameType.value === type) return; // Skip if same type
 
-  // Prüfen, ob zu viele Spieler auf dem Feld sind
-  const currentFieldPlayers = tacticManager.getCurrentFieldPlayerCount();
-
-  
-  // Spieltyp wechseln und Spieler neu verteilen
+  // Change game type and redistribute players
   tacticManager.setGameType(type);
   tacticManager.redistributePlayers();
 }
@@ -34,7 +30,7 @@ function setGameType(type) {
 function setTactic(tacticName) {
   const result = tacticManager.setTactic(tacticName);
   if (result) {
-    // Wenn die Taktik erfolgreich gewechselt wurde, Spieler auf die neuen Positionen verteilen
+    // Redistribute players after tactic change
     tacticManager.redistributePlayers();
   }
 }

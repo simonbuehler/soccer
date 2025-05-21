@@ -2,10 +2,14 @@ import { inject, provide } from "vue";
 import { Player, PlayerData } from "../core/models/Player";
 import { useAppStore } from "../stores/appStore";
 
-// Symbol für Dependency Injection
+/**
+ * Injection symbol for PlayerService dependency injection
+ */
 export const PlayerServiceSymbol = Symbol("PlayerService");
 
-// Interface für den Service
+/**
+ * Service interface for player management operations
+ */
 export interface PlayerService {
   findPlayer(playerId: string): Player | undefined;
   getBenchPlayers(): Player[];
@@ -25,28 +29,28 @@ export interface PlayerService {
 }
 
 /**
- * Composable für die Spielerverwaltung
- * @throws {Error} Wenn PlayerService nicht über providePlayerService bereitgestellt wurde
- * @returns {PlayerService} Der PlayerService mit allen Methoden
+ * Vue composable for accessing the PlayerService
+ * @throws {Error} When PlayerService was not provided via providePlayerService
+ * @returns {PlayerService} The PlayerService instance with all methods
  */
 export function usePlayerService(): PlayerService {
   const service = inject<PlayerService>(PlayerServiceSymbol);
   if (!service) {
-    throw new Error("PlayerService nicht gefunden!");
+    throw new Error("PlayerService not found!");
   }
   return service;
 }
 
 /**
- * Stellt den PlayerService für die Anwendung bereit (Dependency Injection)
- * Diese Funktion MUSS in App.vue aufgerufen werden
- * @returns {PlayerService} Die erstellte Service-Instanz
+ * Provides PlayerService for the application (Dependency Injection)
+ * This function MUST be called in App.vue
+ * @returns {PlayerService} The created service instance
  */
 export function providePlayerService(): PlayerService {
-  // Store für den Service bereitstellen
+  // Get app store instance
   const store = useAppStore();
 
-  // Prüfen, ob der Store richtig initialisiert wurde
+  // Verify store is properly initialized
   if (
     !store ||
     !store.fieldPlayers ||
@@ -59,9 +63,9 @@ export function providePlayerService(): PlayerService {
     );
   }
 
-  // Service-Objekt mit allen Methoden
+  // Create service object with all methods
   const playerService: PlayerService = {
-    // Spieler-Zugriffsmethoden
+    // Player access methods
     findPlayer(playerId): Player | undefined {
       return store.findPlayerById(playerId);
     },
@@ -74,20 +78,20 @@ export function providePlayerService(): PlayerService {
       return store.fieldPlayers;
     },
 
-    // Datenmanipulations-Methoden
+    // Data manipulation methods
     addPlayer(playerData): boolean {
-      // Duplikatprüfung
+      // Check for duplicate player (same number or full name)
       if (this.isDuplicate(playerData)) {
         return false;
       }
 
-      // Erstelle neuen Spieler
+      // Create and initialize new player instance
       const player = new Player(playerData);
 
-      // Löse Namenskonflikte
+      // Resolve naming conflicts (same first names)
       this.resolveNameConflicts(player);
 
-      // Zum Store hinzufügen (standardmäßig auf die Bank)
+      // Add player to store (defaults to bench position)
       store.addPlayer(player);
       return true;
     },
@@ -107,7 +111,7 @@ export function providePlayerService(): PlayerService {
     },
 
     resolveNameConflicts(player): void {
-      // Alle Spieler mit dem gleichen Vornamen finden
+      // Find players with matching first names
       const allPlayers = [...store.fieldPlayers, ...store.benchPlayers];
       const sameFirstNamePlayers = allPlayers.filter(
         (p) => p.firstName === player.firstName
@@ -135,33 +139,29 @@ export function providePlayerService(): PlayerService {
         return false;
       }
 
-      let result = false;
-
-      if (options.location && options.location !== player.location) {
-        if (options.location === "pitch") {
-          // Zur Position auf dem Feld bewegen
-          result = store.movePlayerToField(
-            playerId,
-            options.x !== undefined ? options.x : player.percentX,
-            options.y !== undefined ? options.y : player.percentY
-          );
-        } else if (options.location === "bench") {
-          // Zur Bank bewegen
-          result = store.movePlayerToBench(playerId);
-        }
-      } else if (
-        player.location === "pitch" &&
-        (options.x !== undefined || options.y !== undefined)
-      ) {
-        // Position auf dem Feld aktualisieren
-        result = store.updatePlayerPosition(
+      // Update player position coordinates
+      if (options.x !== undefined || options.y !== undefined) {
+        return store.updatePlayerPosition(
           playerId,
           options.x !== undefined ? options.x : player.percentX,
           options.y !== undefined ? options.y : player.percentY
         );
       }
 
-      return result;
+      // Move player between bench and field
+      if (options.location) {
+        if (options.location === "pitch") {
+          return store.movePlayerToField(
+            playerId,
+            player.percentX,
+            player.percentY
+          );
+        } else if (options.location === "bench") {
+          return store.movePlayerToBench(playerId);
+        }
+      }
+
+      return false;
     },
 
     handlePlayerPositioning(playerId, targetX, targetY) {
@@ -171,7 +171,7 @@ export function providePlayerService(): PlayerService {
         return false;
       }
 
-      // Validiere die Eingabeparameter
+      // Validate coordinate parameters
       if (
         targetX === undefined ||
         targetY === undefined ||
@@ -185,12 +185,12 @@ export function providePlayerService(): PlayerService {
         return false;
       }
 
-      // Direkte Positionierung ohne Snap-Logik oder Kollisionserkennung
+      // Direct positioning without snap logic or collision detection
       let result = false;
 
-      // Prüfen, ob der Spieler bereits auf dem Feld ist oder neu hinzugefügt wird
+      // Handle bench-to-field transition
       if (store.getPlayerLocation(playerId) === "bench") {
-        // Spieler ist auf der Bank und muss zum Feld bewegt werden
+        // Move from bench to field with coordinates
         result = store.movePlayerToField(playerId, targetX, targetY);
         if (!result) {
           console.error("[PlayerService] Failed to move player to field", {
@@ -200,7 +200,7 @@ export function providePlayerService(): PlayerService {
           return false;
         }
       } else {
-        // Spieler ist bereits auf dem Feld, nur Position aktualisieren
+        // Update existing field position
         result = store.updatePlayerPosition(playerId, targetX, targetY);
         if (!result) {
           console.error("[PlayerService] Failed to update player position", {
@@ -215,7 +215,7 @@ export function providePlayerService(): PlayerService {
     },
   };
 
-  // Service über Dependency Injection bereitstellen
+  // Provide service via Dependency Injection
   provide(PlayerServiceSymbol, playerService);
   return playerService;
 }

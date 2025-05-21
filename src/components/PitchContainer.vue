@@ -92,25 +92,25 @@ const containerDimensions = ref({
 
 // UI state tracking
 const highlightedMarkerIndex = ref(-1);
-// Umbenennung von playerIdAtHighlightedPosition zu highlightedPlayerIds
+// Renamed from playerIdAtHighlightedPosition to highlightedPlayerIds
 const highlightedPlayerIds = ref<string[]>([]);
 
 // Maximale Spieleranzahl und Warnungsanzeige
 const maxAllowedPlayers = computed(() => tacticManager.getCurrentGameType());
 const showMaxPlayersWarning = ref(false);
 
-// Überwache Änderungen der Spieleranzahl
+// Track changes to player count
 const isMaxPlayersExceeded = computed(() => {
   return fieldPlayers.value.length >= maxAllowedPlayers.value;
 });
 
-// Zeige Warnung, wenn zu viele Spieler auf dem Feld sind
+// Show warning when too many players on field
 function checkAndShowWarning() {
   if (isMaxPlayersExceeded.value) {
     showMaxPlayersWarning.value = true;
     setTimeout(() => {
       showMaxPlayersWarning.value = false;
-    }, 3000); // 3 Sekunden anzeigen
+    }, 3000);
   }
 }
 
@@ -218,10 +218,10 @@ function findPlayerAtPosition(x: number, y: number): string | null {
 }
 
 /**
- * Findet alle Spieler im Umkreis einer Position und markiert sie
- * @param xPercent - Horizontale Position (0-100%)
- * @param yPercent - Vertikale Position (0-100%)
- * @returns Array mit IDs der gefundenen Spieler
+ * Finds all players within radius of a position and highlights them
+ * @param xPercent - Horizontal position (0-100%)
+ * @param yPercent - Vertical position (0-100%) 
+ * @returns Array of found player IDs
  */
 function findPlayersInRadius(xPercent: number, yPercent: number): string[] {
   if (!fieldPlayers.value.length) return [];
@@ -230,7 +230,6 @@ function findPlayersInRadius(xPercent: number, yPercent: number): string[] {
   const radiusSquared = radius * radius;
   const nearbyPlayers: string[] = [];
 
-  // Alle Spieler im Radius finden
   fieldPlayers.value.forEach(player => {
     const dx = xPercent - player.percentX;
     const dy = yPercent - player.percentY;
@@ -241,13 +240,12 @@ function findPlayersInRadius(xPercent: number, yPercent: number): string[] {
     }
   });
 
-  // IDs setzen und zurückgeben
   highlightedPlayerIds.value = nearbyPlayers;
   return nearbyPlayers;
 }
 
 /**
- * Löscht alle Hervorhebungen von Markern und Spielern
+ * Clears all marker and player highlights
  */
 function clearHighlights(): void {
   highlightedMarkerIndex.value = -1;
@@ -255,10 +253,10 @@ function clearHighlights(): void {
 }
 
 /**
- * Findet und hebt den nächsten Positionsmarker hervor
- * @param xPercent - Horizontale Position (0-100%)
- * @param yPercent - Vertikale Position (0-100%)
- * @returns Positionsdaten, wenn ein Marker nahe genug ist, sonst null
+ * Finds and highlights the closest position marker
+ * @param xPercent - Horizontal position (0-100%)
+ * @param yPercent - Vertical position (0-100%)
+ * @returns Position data if marker is close enough, otherwise null
  */
 function highlightClosestMarker(xPercent: number, yPercent: number) {
   // Exit early if conditions aren't met
@@ -308,10 +306,10 @@ function highlightClosestMarker(xPercent: number, yPercent: number) {
       return null;
     }
 
-    // Prüfe auf Spieler an dieser Position
+    // Check for player at this position
     const playerId = findPlayerAtPosition(closestMarker.x, closestMarker.y);
 
-    // Wenn ein Spieler gefunden wurde, füge ihn zum Array hinzu
+    // If player found, add to array
     if (playerId) {
       highlightedPlayerIds.value = [playerId];
     }
@@ -360,13 +358,13 @@ dragAndDrop<Player>({
           (((clientY - viewportTop) / height) * 100).toFixed(2)
         );
 
-        // Nur verarbeiten, wenn Koordinaten innerhalb des Feldes sind
+        // Only process if coordinates are within field bounds
         if (xPercent >= 0 && xPercent <= 100 && yPercent >= 0 && yPercent <= 100) {
           if (shouldShowMarkers.value) {
-            // Formation tactic: Markiere den nächsten Positionsmarker
+            // Formation tactic: Highlight closest position marker
             highlightClosestMarker(xPercent, yPercent);
           } else {
-            // Free formation: Finde und markiere Spieler im Umkreis
+            // Free formation: Find and highlight players in radius
             findPlayersInRadius(xPercent, yPercent);
           }
         } else {
@@ -400,11 +398,11 @@ dragAndDrop<Player>({
       return;
     }
 
-    // Prüfe, ob der Spieler bereits auf dem Feld ist
+    // Check if player is already on field
     const alreadyOnField = store.getPlayerLocation(playerId) === "pitch";
 
-    // Wenn Spieler noch nicht auf dem Feld ist und maximale Spieleranzahl erreicht,
-    // dann Positionierung verhindern und Warnung anzeigen
+    // If player not on field and max players reached,
+    // prevent positioning and show warning
     if (!alreadyOnField && isMaxPlayersExceeded.value) {
       console.warn(`[WARNING-PITCH] Maximum player count (${maxAllowedPlayers.value}) exceeded, preventing drop`);
       checkAndShowWarning();
@@ -520,10 +518,10 @@ dragAndDrop<Player>({
   },
 });
 
-// Auch für movePlayerToField eine Begrenzung einfügen
+// Also add limit for movePlayerToField
 const originalMoveToField = store.movePlayerToField;
 store.movePlayerToField = (id, x, y) => {
-  // Wenn der Spieler neu aufs Feld kommt und zu viele Spieler dort sind, abbrechen
+  // If player is new to field and too many players, cancel
   const playerLocation = id ? store.getPlayerLocation(id) : "bench";
   if (playerLocation === "bench" && isMaxPlayersExceeded.value) {
     console.warn(`[WARNING-STORE] Maximum player count (${maxAllowedPlayers.value}) exceeded, preventing move`);

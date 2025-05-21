@@ -1,7 +1,6 @@
 /**
- * Player-Klasse für das Domain-Modell
+ * Data structure for player information
  */
-
 export interface PlayerData {
   id?: string;
   number: number;
@@ -12,6 +11,9 @@ export interface PlayerData {
   displayName?: string;
 }
 
+/**
+ * Represents a soccer player with position and display properties
+ */
 export class Player {
   id: string;
   number: number;
@@ -30,11 +32,17 @@ export class Player {
     this.percentX = data.percentX || 0;
     this.percentY = data.percentY || 0;
     this.displayName = data.displayName || this.firstName;
-    console.debug(`Player created: ${this.id}, ${this.displayName}`);
+    console.debug(`Created player: ${this.displayName} (ID: ${this.id})`);
   }
 
+  /**
+   * Updates and returns the display name based on formatting options
+   * @param showLastName - Whether to include full last name
+   * @param showInitial - Whether to show last name initial
+   * @returns Formatted display name string
+   */
   updateDisplayName(showLastName = false, showInitial = false): string {
-    // Nur den ersten Vornamen verwenden, falls es mehrere gibt
+    // Use only first part if firstName contains multiple names
     const firstNamePart = this.firstName.split(" ")[0];
     let lastNamePart = "";
     
