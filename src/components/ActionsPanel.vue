@@ -1,43 +1,51 @@
 <script setup>
-  import { ref, computed } from "vue";
-  import { useTacticManager } from "@/composables/useTacticManager";
-  import TacticInfoModal from "@/components/TacticInfoModal.vue";
+import { ref, computed } from "vue";
+import { useTacticManager } from "@/composables/useTacticManager";
+import TacticInfoModal from "@/components/TacticInfoModal.vue";
 
-  const tacticManager = useTacticManager();
-  const showTacticInfo = ref(false);
+const tacticManager = useTacticManager();
+const showTacticInfo = ref(false);
 
-  // Event Emits definieren
-  const emit = defineEmits(["open-player-dialog", "print"]);
+// Event Emits definieren
+const emit = defineEmits(["open-player-dialog", "print"]);
 
-  const gameTypes = [
-    { value: 7, label: "7er" },
-    { value: 9, label: "9er" },
-    { value: 11, label: "11er" },
-  ];
+const gameTypes = [
+  { value: 7, label: "7er" },
+  { value: 9, label: "9er" },
+  { value: 11, label: "11er" },
+];
 
-  const currentTactic = computed(() => tacticManager.getCurrentTactic());
-  const tactics = computed(() => tacticManager.getTacticsForCurrentGameType());
-  const currentGameType = computed(() => tacticManager.getCurrentGameType());
+const currentTactic = computed(() => tacticManager.getCurrentTactic());
+const tactics = computed(() => tacticManager.getTacticsForCurrentGameType());
+const currentGameType = computed(() => tacticManager.getCurrentGameType());
 
-  function setGameType(type) {
-    tacticManager.setGameType(type);
+function setGameType(type) {
+  if (currentGameType.value === type) return; // Keine Änderung wenn gleicher Typ
+
+  // Prüfen, ob zu viele Spieler auf dem Feld sind
+  const currentFieldPlayers = tacticManager.getCurrentFieldPlayerCount();
+
+  
+  // Spieltyp wechseln und Spieler neu verteilen
+  tacticManager.setGameType(type);
+  tacticManager.redistributePlayers();
+}
+
+function setTactic(tacticName) {
+  const result = tacticManager.setTactic(tacticName);
+  if (result) {
+    // Wenn die Taktik erfolgreich gewechselt wurde, Spieler auf die neuen Positionen verteilen
+    tacticManager.redistributePlayers();
   }
+}
 
-  function setTactic(tacticName) {
-    const result = tacticManager.setTactic(tacticName);
-    if (result) {
-      // Wenn die Taktik erfolgreich gewechselt wurde, Spieler auf die neuen Positionen verteilen
-      tacticManager.redistributePlayers();
-    }
-  }
+function openPlayerDialog() {
+  emit("open-player-dialog");
+}
 
-  function openPlayerDialog() {
-    emit("open-player-dialog");
-  }
-
-  function print() {
-    emit("print");
-  }
+function print() {
+  emit("print");
+}
 </script>
 
 <template>
@@ -71,20 +79,14 @@
 
       <!-- Taktik Auswahl -->
       <div class="w-full">
-        <label class="block text-sm font-medium text-gray-700 mb-1"
-          >Taktik wählen:</label
-        >
+        <label class="block text-sm font-medium text-gray-700 mb-1">Taktik wählen:</label>
         <div class="flex items-center">
           <select
             :value="currentTactic?.name || ''"
             @change="setTactic($event.target.value)"
             class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
           >
-            <option
-              v-for="tactic in tactics"
-              :key="tactic.name"
-              :value="tactic.name"
-            >
+            <option v-for="tactic in tactics" :key="tactic.name" :value="tactic.name">
               {{ tactic.name }}
             </option>
           </select>
@@ -121,10 +123,7 @@
             {{ currentTactic.description }}
           </p>
           <ul class="list-disc list-inside text-sm text-gray-600 mt-1">
-            <li
-              v-for="(point, index) in currentTactic.bulletpoints"
-              :key="index"
-            >
+            <li v-for="(point, index) in currentTactic.bulletpoints" :key="index">
               {{ point }}
             </li>
           </ul>

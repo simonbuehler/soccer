@@ -30,7 +30,7 @@
   >
     <!-- Player visual representation -->
     <div
-      class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-white flex items-center justify-center shadow-lg border-2 border-white relative hover:shadow-xl hover:scale-110 transition-all duration-200 overflow-hidden"
+      class="w-16 h-16 rounded-full text-white flex items-center justify-center shadow-lg border-2 border-white relative hover:shadow-xl hover:scale-110 transition-all duration-200 overflow-hidden bg-gradient-to-br from-blue-500 to-blue-700"
     >
       <!-- Player number in background -->
       <div

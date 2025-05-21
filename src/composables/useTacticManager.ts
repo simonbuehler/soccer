@@ -11,7 +11,6 @@ interface Position {
   y: number;
   role: string;
   index?: number;
-  isRequired?: boolean;
   assigned?: boolean;
   xPercent?: number;
   yPercent?: number;
@@ -40,7 +39,6 @@ interface AppStore {
 
 export function useTacticManager() {
   const store = useAppStore() as unknown as AppStore;
-  const isRedistributing = ref(false);
 
   function initializeGame(): void {
     store.gameType = 7;
@@ -110,26 +108,62 @@ export function useTacticManager() {
       (pos: TacticPosition, index: number) => ({
         ...pos,
         index,
-        isRequired: !store.currentTactic?.name.includes("Frei"),
         x: pos.xPercent || pos.x || 0,
         y: pos.yPercent || pos.y || 0,
       })
     );
   }
   function redistributePlayers(): boolean {
-    if (isRedistributing.value) {
-      console.log("[TACTIC] Already redistributing, skipping");
-      return false;
-    }
-
-    isRedistributing.value = true;
-
     try {
-      if (!store.currentTactic?.positions?.length) {
-        console.log("[TACTIC] No positions in tactic, skipping redistribution");
+      // Check if a valid tactic exists
+      if (!store.currentTactic) {
+        console.log("[TACTIC] No tactic set, skipping redistribution");
         return false;
       }
 
+      // Gather info about all players
+      const fieldPlayers = [...store.fieldPlayers];
+      const fieldPlayerIds = fieldPlayers.map((p) => p.id);
+      const benchPlayerIds = store.benchPlayers.map((p) => p.id);
+      
+      // Check if positions are defined
+      const hasPositions = !!store.currentTactic.positions?.length;
+
+      // Determine max players allowed
+      const maxAllowedPlayers = store.gameType;
+      
+      console.log(
+        `[TACTIC] Redistribution started: ${maxAllowedPlayers} positions needed, ${fieldPlayerIds.length} field players, ${benchPlayerIds.length} bench players`
+      );
+      
+      // Handle excess players for both free tactics and positioned tactics
+      if (fieldPlayers.length > maxAllowedPlayers) {
+        console.log(
+          `[TACTIC] Found ${fieldPlayers.length} players on field but only ${maxAllowedPlayers} allowed`
+        );
+
+        // Sort players by priority
+        const sortedIds = prioritizePlayers(fieldPlayerIds);
+
+        // Players to move to bench
+        const playersToMove = sortedIds.slice(maxAllowedPlayers);
+
+        // Move excess players to bench
+        playersToMove.forEach((id) => {
+          const player = store.findPlayerById(id);
+          console.log(
+            `[TACTIC] Moving excess player ${player?.firstName || id} to bench`
+          );
+          store.movePlayerToBench(id);
+        });
+      }
+
+      // If using a tactic without positions, we're done after limiting player count
+      if (!hasPositions) {
+        console.log("[TACTIC] Free tactic processing complete");
+        return true;
+      }
+    
       // Create markers from tactic positions
       const playerAssignmentMap = new Map<string, number>();
       const markers: Position[] = store.currentTactic.positions.map(
@@ -144,162 +178,93 @@ export function useTacticManager() {
         })
       );
 
-      // Gather info about all players
-      const fieldPlayers = [...store.fieldPlayers];
-      const fieldPlayerIds = fieldPlayers.map((p) => p.id);
-      const benchPlayerIds = store.benchPlayers.map((p) => p.id);
-
-      console.log(
-        `[TACTIC] Redistribution started: ${markers.length} positions, ${fieldPlayerIds.length} field players, ${benchPlayerIds.length} bench players`
-      );
-
-      // Determine which players we need to keep and add
-      const totalPlayersNeeded = Math.min(
-        markers.length,
-        fieldPlayerIds.length + benchPlayerIds.length
-      );
-
-      // IMPROVED APPROACH: Don't just move players around blindly
-      // Instead, make intelligent decisions about who stays and who goes
-      if (fieldPlayerIds.length > totalPlayersNeeded) {
-        // We have too many players on field - need to select who stays
-
-        // Sort field players by priority (goalkeepers first, defenders second, etc)
-        const sortedFieldPlayerIds = prioritizePlayers(fieldPlayerIds);
-
-        // Players to keep on field
-        const keepIds = sortedFieldPlayerIds.slice(0, totalPlayersNeeded);
-
-        // Players to move to bench
-        const moveIds = sortedFieldPlayerIds.slice(totalPlayersNeeded);
-
-        console.log(
-          `[TACTIC] Too many field players: keeping ${keepIds.length}, moving ${moveIds.length} to bench`
-        );
-
-        // Move excess players to bench
-        moveIds.forEach((id) => {
-          console.log(`[TACTIC] Moving player ${id} to bench (excess)`);
-          store.movePlayerToBench(id);
-        });
-      } else if (fieldPlayerIds.length < totalPlayersNeeded) {
-        // We need MORE players from bench
-        const additionalPlayersNeeded = Math.min(
-          totalPlayersNeeded - fieldPlayerIds.length,
-          benchPlayerIds.length
-        );
-
-        if (additionalPlayersNeeded > 0 && benchPlayerIds.length > 0) {
-          console.log(
-            `[TACTIC] Need ${additionalPlayersNeeded} players from bench`
-          );
-
-          // Get players from bench (take the first N available)
-          const benchIdsToMove = benchPlayerIds.slice(
-            0,
-            additionalPlayersNeeded
-          );
-
-          // Add them to temporary positions in the middle of the field
-          benchIdsToMove.forEach((id, idx) => {
-            const tempX = 50 + (idx % 3) * 10;
-            const tempY = 50 + Math.floor(idx / 3) * 10;
-            console.log(
-              `[TACTIC] Moving player ${id} from bench to field at temporary position (${tempX}, ${tempY})`
-            );
-            store.movePlayerToField(id, tempX, tempY);
-          });
+      // Ggf. fehlende Spieler von der Bank holen
+      const neededPlayers = markers.length - store.fieldPlayers.length;
+      
+      if (neededPlayers > 0) {
+        console.log(`[TACTIC] Need ${neededPlayers} players from bench`);
+        
+        // Temporäre Positionen für neue Spieler vom Mittelfeld aus verteilen
+        for (let i = 0; i < neededPlayers; i++) {
+          const tempX = 50 + (i % 3) * 10;
+          const tempY = 50 + Math.floor(i / 3) * 10;
+          
+          console.log(`[TACTIC] Moving player from bench to field at temporary position (${tempX}, ${tempY})`);
+          // Store-Methode nutzen, um automatisch einen Spieler auszuwählen
+          store.movePlayerToField(undefined, tempX, tempY);
         }
       }
 
-      // Now we have the correct number of players on the field
-      // Assign them to optimal positions
-      console.log(`[TACTIC] Assigning players to positions`);
-
-      // Special handling for goalkeeper (if any position is a goalkeeper position)
-      const keeperPositions = markers.filter(
-        (m) =>
-          m.role?.toLowerCase().includes("keeper") ||
-          m.role?.toLowerCase().includes("goalie") ||
-          m.role?.toLowerCase().includes("torwart")
-      );
-
-      // Find players with goalkeeper role or #1
-      const currentFieldPlayers = [...store.fieldPlayers];
-      const keeperPlayers = currentFieldPlayers.filter((p) => p.number === 1);
-
-      // If we have both keepers and keeper positions, match them first
-      if (keeperPositions.length > 0 && keeperPlayers.length > 0) {
-        const keeperMarker = keeperPositions[0];
-        const keeper = keeperPlayers[0];
-
-        console.log(
-          `[TACTIC] Assigning keeper ${keeper.firstName} to position ${keeperMarker.role}`
-        );
-        keeperMarker.assigned = true;
-        playerAssignmentMap.set(keeper.id, keeperMarker.index!);
-        store.updatePlayerPosition(keeper.id, keeperMarker.x, keeperMarker.y);
-      }
-
-      // Now assign remaining players to positions
-      // For each player, find the closest unassigned position
-      const remainingPlayers = currentFieldPlayers.filter(
-        (p) => !playerAssignmentMap.has(p.id)
-      );
-
-      remainingPlayers.forEach((player) => {
-        const availableMarkers = markers.filter((m) => !m.assigned);
-        if (availableMarkers.length === 0) return;
-
-        // Find the closest marker for this player
-        let bestMarker = availableMarkers[0];
-        let minDistance = Infinity;
-
-        availableMarkers.forEach((marker) => {
-          const distance = Math.sqrt(
-            Math.pow(player.percentX - marker.x, 2) +
-              Math.pow(player.percentY - marker.y, 2)
-          );
-
-          if (distance < minDistance) {
-            minDistance = distance;
-            bestMarker = marker;
-          }
-        });
-
-        // Assign player to this marker
-        bestMarker.assigned = true;
-        playerAssignmentMap.set(player.id, bestMarker.index!);
-
-        // Update player position
-        console.log(
-          `[TACTIC] Positioning ${player.firstName} at ${
-            bestMarker.role
-          } (${bestMarker.x.toFixed(1)}, ${bestMarker.y.toFixed(1)})`
-        );
-        store.updatePlayerPosition(player.id, bestMarker.x, bestMarker.y);
-      });
+      // Spieler optimal auf Positionen verteilen
+      assignPlayersToPositions(markers);
 
       console.log(
-        `[TACTIC] Redistribution complete: ${playerAssignmentMap.size}/${totalPlayersNeeded} players assigned`
+        `[TACTIC] Redistribution complete: ${playerAssignmentMap.size}/${markers.length} players assigned`
       );
       return true;
     } catch (error) {
       console.error("[TACTIC] Error during player redistribution:", error);
       return false;
-    } finally {
-      isRedistributing.value = false;
     }
   }
 
+  // Vereinfachte Funktion zur Spielerzuordnung ohne separates Keeper-Handling
+  function assignPlayersToPositions(markers: Position[]): void {
+    const currentFieldPlayers = [...store.fieldPlayers];
+    const playerAssignmentMap = new Map<string, number>();
+    
+    // Sortiere Spieler nach Nummer (niedrigste zuerst)
+    const sortedPlayers = [...currentFieldPlayers].sort((a, b) => a.number - b.number);
+    
+    // Jedem Spieler die passendste Position zuweisen
+    sortedPlayers.forEach((player) => {
+      const availableMarkers = markers.filter((m) => !m.assigned);
+      if (availableMarkers.length === 0) return;
+
+      // Find the closest marker for this player
+      let bestMarker = availableMarkers[0];
+      let minDistance = Infinity;
+
+      availableMarkers.forEach((marker) => {
+        const distance = Math.sqrt(
+          Math.pow(player.percentX - marker.x, 2) +
+            Math.pow(player.percentY - marker.y, 2)
+        );
+
+        if (distance < minDistance) {
+          minDistance = distance;
+          bestMarker = marker;
+        }
+      });
+
+      // Assign player to this marker
+      bestMarker.assigned = true;
+      playerAssignmentMap.set(player.id, bestMarker.index!);
+
+      // Update player position
+      console.log(
+        `[TACTIC] Positioning ${player.firstName} (#${player.number}) at ${
+          bestMarker.role
+        } (${bestMarker.x.toFixed(1)}, ${bestMarker.y.toFixed(1)})`
+      );
+      store.updatePlayerPosition(player.id, bestMarker.x, bestMarker.y);
+    });
+  }
+
+  // Verbesserte Spieler-Priorisierung
   function prioritizePlayers(playerIds: string[]): string[] {
     return [...playerIds].sort((idA, idB) => {
       const playerA = store.findPlayerById(idA);
       const playerB = store.findPlayerById(idB);
       if (!playerA || !playerB) return 0;
+      
+      // Priorität 1: Torhüter immer zuerst
       if (playerA.number === 1) return -1;
       if (playerB.number === 1) return 1;
-      return playerA.percentY - playerB.percentY;
+      
+      // Priorität 2: Sortiere nach Position (von hinten nach vorne)
+      // Nutze die Y-Position als Indikator für die Position auf dem Feld
+      return playerB.percentY- playerA.percentY ;
     });
   }
 
@@ -315,6 +280,10 @@ export function useTacticManager() {
     return store.currentTactic;
   }
 
+  function getCurrentFieldPlayerCount(): number {
+    return store.fieldPlayers.length;
+  }
+
   return {
     initializeGame,
     setGameType,
@@ -324,5 +293,6 @@ export function useTacticManager() {
     getTacticsForCurrentGameType,
     getCurrentGameType,
     getCurrentTactic,
+    getCurrentFieldPlayerCount,
   };
 }

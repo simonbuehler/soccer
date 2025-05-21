@@ -20,22 +20,29 @@
 </script>
 
 <template>
+  <!-- Container für die gesamte Seite - responsive Layout für alle Breakpoints -->
   <div class="flex flex-col lg:flex-row gap-8 p-4">
-    <!-- Left column with actions and substitutes -->
-    <div class="w-full lg:max-w-96 flex flex-col gap-4 order-1 print-order-2">
-      <ActionsPanel
-        @open-player-dialog="showPlayerDialog = true"
-        @print="handlePrint"
-      />
+    
+    <!-- Linke Spalte: Actions und Bench bei lg+ Layout -->
+    <div class="w-full lg:w-1/3  lg:max-w-md flex flex-col md:flex-row lg:flex-col gap-4 print:order-2">
+      <!-- Actions Panel - bei md nebeneinander, sonst übereinander -->
+      <div class="w-full md:w-1/2 lg:w-full ">
+        <ActionsPanel
+          @open-player-dialog="showPlayerDialog = true"
+          @print="handlePrint"
+        />
+      </div>
+
+      <!-- Bench Container - bei md nebeneinander, sonst übereinander -->
+      <div class="w-full md:w-1/2 lg:w-full ">
+        <BenchContainer />
+      </div>
     </div>
 
-    <!-- Football pitch -->
-    <div
-      class="flex-1 flex order-3 mb-4 lg:mb-0 print-order-1 print:justify-center"
-    >
+    <!-- Rechte Spalte: Spielfeld bei lg+ Layout -->
+    <div class="flex-1 flex mb-4 lg:mb-0 print:order-1 print:justify-center">
       <PitchContainer />
     </div>
-    <BenchContainer class="order-2 lg:order-3" />
 
     <!-- Modals mit v-model -->
     <PlayerDialog
